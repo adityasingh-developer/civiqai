@@ -1,0 +1,26 @@
+﻿:global(.ask-input:hover::-webkit-scrollbar) {
+  width: 6px;
+  cursor: pointer;
+}
+
+:global(.ask-input:hover::-webkit-scrollbar-thumb) {
+  background-color: rgba(120, 113, 108, 0.6);
+  border-radius: 999px;
+}
+
+:global(.ask-input:hover::-webkit-scrollbar-track) {
+  background: transparent;
+}
+
+:global(.dark .ask-input:hover::-webkit-scrollbar-thumb) {
+  background-color: rgba(231, 229, 228, 0.35);
+}
+
+:global(.ask-input) {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(120, 113, 108, 0.6) transparent;
+}
+
+:global(.dark .ask-input) {
+  scrollbar-color: rgba(231, 229, 228, 0.35) transparent;
+}
