@@ -68,8 +68,12 @@ const SearchBar = () => {
         event.target.value = "";
     }
 
-    const removeDoc = () => {
+    const removeDoc = (index) => {
+        setDocs((prev) => prev.filter((_, i) => i !== index));
+    }
 
+    const removeImage = (index) => {
+        setImages((prev) => prev.filter((_, i) => i !== index));
     }
     
     useEffect(() => {
@@ -89,20 +93,18 @@ const SearchBar = () => {
                             <span className="h-1 w-[95%] rounded-xs animate-pulse [animation-duration:1s] bg-stone-600"></span>
                             <span className="h-1 w-[95%] rounded-xs animate-pulse [animation-duration:1s] bg-stone-600"></span>
                             <span className="h-1 w-[95%] rounded-xs animate-pulse [animation-duration:1s] bg-stone-600"></span>
-                            <button onClick={() => { }} className="absolute bg-stone-900 opacity-0 rounded-full group-hover:opacity-100 duration-200 cursor-pointer p-px right-1 top-1"><X size={16} strokeWidth={3} /></button>
+                            <button onClick={() => {removeDoc(index)}} className="absolute bg-stone-900 opacity-0 rounded-full group-hover:opacity-100 duration-200 cursor-pointer p-px right-1 top-1"><X size={16} strokeWidth={3} /></button>
                         </span>
                     ))}
                     {images.map((img, index) => (
-                        <CustomTooltip content={img.file.name} key={`img-${fileKey(img.file)}`}>
-                            <span className="flex items-center relative h-22 w-22 group gap-2 rounded-2xl bg-[#ccc8c5] justify-center text-xs text-stone-700 dark:bg-[#272320] dark:text-stone-200">
+                            <span key={`img-${fileKey(img.file)}`} className="flex items-center relative h-22 w-22 group gap-2 rounded-2xl bg-[#ccc8c5] justify-center text-xs text-stone-700 dark:bg-[#272320] dark:text-stone-200">
                                 <img
                                     src={img.url}
                                     alt={img.file.name}
                                     className="h-15 w-15 object-cover rounded-md"
                                 />
-                                <button onClick={() => { }} className="absolute bg-stone-900 opacity-0 group-hover:opacity-100 duration-200 cursor-pointer rounded-full p-px right-1 top-1"><X size={16} strokeWidth={3} /></button>
+                                <button onClick={() => {removeImage(index)}} className="absolute bg-stone-900 opacity-0 group-hover:opacity-100 duration-200 cursor-pointer rounded-full p-px right-1 top-1"><X size={16} strokeWidth={3} /></button>
                             </span>
-                        </CustomTooltip>
                     ))}
                 </div>
             )}

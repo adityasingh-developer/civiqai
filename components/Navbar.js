@@ -1,7 +1,16 @@
-﻿import ThemeToggle from "@/components/ThemeToggle";
+﻿"use client";
+
+import ThemeToggle from "@/components/ThemeToggle";
 import Logo from "@/assets/logo.svg";
+import { usePathname } from "next/navigation";
+import { signIn, signOut, useSession } from "next-auth/react";
 
 const Navbar = ({ userImageUrl = "", userName = "User" }) => {
+  const pathname = usePathname();
+  const { data: session, status } = useSession();
+  const displayName = session?.user?.name || session?.user?.email || userName;
+  const imageUrl = session?.user?.image || userImageUrl;
+  const initial = displayName?.slice(0, 1)?.toUpperCase() || "U";
   return (
     <nav className="fixed inset-x-0 top-0 z-100000">
       <div className="grid grid-cols-[1fr_auto_1fr] items-start">
@@ -10,22 +19,32 @@ const Navbar = ({ userImageUrl = "", userName = "User" }) => {
           <div className="grid h-full grid-cols-[1fr_auto_1fr] items-center px-6">
             <div className="justify-self-start" />
             <div className="justify-self-center">
-              <Logo className="h-10 w-10" />
+              {pathname === '/chat' ? <h1 className="text-xl font-bold">User Chat</h1> :  <Logo className="h-10 w-10" />}
             </div>
             <div className="justify-self-end">
               <div className="flex items-center gap-3">
                 <ThemeToggle />
-                <span className="inline-flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-white/20 text-md font-semibold text-white  dark:bg-stone-950/30 dark:text-stone-100 cursor-pointer">
-                  {userImageUrl ? (
-                    <img
-                      src={userImageUrl}
-                      alt={`${userName} profile`}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    userName.slice(0, 1).toUpperCase()
-                  )}
-                </span>
+                {session?.user ? (
+                  <span className="inline-flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-white/20 text-md font-semibold text-white dark:bg-stone-950/30 dark:text-stone-100 cursor-pointer">
+                    {imageUrl ? (
+                      <img
+                        src={imageUrl}
+                        alt={`${displayName} profile`}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      initial
+                    )}
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => signIn()}
+                    className="inline-flex items-center gap-2 rounded-full bg-white/20 px-4 py-1 text-md font-medium text-white shadow-sm duration-200 cursor-pointer hover:bg-stone-700 dark:bg-stone-950/30 dark:text-stone-100"
+                  >
+                    {status === "loading" ? "Loading..." : "Sign in"}
+                  </button>
+                )}
               </div>
             </div>
           </div>

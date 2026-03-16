@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import SearchBar from "@/components/SearchBar";
+import { SessionContext } from "next-auth/react";
 
 export default function Home() {
 
