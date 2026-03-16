@@ -1,7 +1,7 @@
 ﻿import ThemeToggle from "@/components/ThemeToggle";
 import Logo from "@/assets/logo.svg";
 
-const Navbar = () => {
+const Navbar = ({ userImageUrl = "", userName = "User" }) => {
   return (
     <nav className="fixed inset-x-0 top-0 z-100000">
       <div className="grid grid-cols-[1fr_auto_1fr] items-start">
@@ -13,7 +13,20 @@ const Navbar = () => {
               <Logo className="h-10 w-10" />
             </div>
             <div className="justify-self-end">
-              <ThemeToggle />
+              <div className="flex items-center gap-3">
+                <ThemeToggle />
+                <span className="inline-flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-white/20 text-md font-semibold text-white  dark:bg-stone-950/30 dark:text-stone-100 cursor-pointer">
+                  {userImageUrl ? (
+                    <img
+                      src={userImageUrl}
+                      alt={`${userName} profile`}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    userName.slice(0, 1).toUpperCase()
+                  )}
+                </span>
+              </div>
             </div>
           </div>
         </div>

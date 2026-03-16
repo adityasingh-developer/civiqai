@@ -3,6 +3,7 @@
 import Send from "@/assets/send.svg";
 import { useEffect, useRef, useState } from "react";
 import CustomTooltip from "@/components/customTooltip";
+import { X } from "lucide-react";
 
 const SearchBar = () => {
     const [prompt, setPrompt] = useState("");
@@ -10,6 +11,9 @@ const SearchBar = () => {
     const [images, setImages] = useState([]);
     const docInputRef = useRef(null);
     const imageInputRef = useRef(null);
+
+    const fileKey = (file) =>
+        `${file.name}__${file.type}__${file.size}__${file.lastModified}`;
 
     const normalizeText = (element) => {
         const raw = element.textContent ?? "";
@@ -37,29 +41,37 @@ const SearchBar = () => {
         range.collapse(false);
         selection.removeAllRanges();
         selection.addRange(range);
-    };
+    }
+
 
     const onPickDocs = (event) => {
         const files = Array.from(event.target.files || []);
         const pdfs = files.filter((file) => file.type === "application/pdf");
-        const next = [...docs, ...pdfs].slice(0, 2);
-        setDocs(next);
+        const existing = new Set(docs.map(fileKey));
+        const unique = pdfs.filter((file) => !existing.has(fileKey(file)));
+        setDocs((prev) => [...prev, ...unique]);
         event.target.value = "";
-    };
+    }
 
     const onPickImages = (event) => {
         const files = Array.from(event.target.files || []);
         const imgs = files.filter((file) =>
             ["image/png", "image/jpeg"].includes(file.type),
         );
-        const withUrls = imgs.map((file) => ({
+        const existing = new Set(images.map((img) => fileKey(img.file)));
+        const unique = imgs.filter((file) => !existing.has(fileKey(file)));
+        const withUrls = unique.map((file) => ({
             file,
             url: URL.createObjectURL(file),
         }));
         setImages((prev) => [...prev, ...withUrls]);
         event.target.value = "";
-    };
+    }
 
+    const removeDoc = () => {
+
+    }
+    
     useEffect(() => {
         return () => {
             images.forEach((img) => URL.revokeObjectURL(img.url));
@@ -67,30 +79,34 @@ const SearchBar = () => {
     }, [images]);
 
     return (
-        <div className="absolute -bottom-75 flex flex-col gap-3 w-[40%]">
+        <div className="relative mx-auto flex w-full max-w-3xl flex-col gap-3">
             {(docs.length > 0 || images.length > 0) && (
-                <div className="left-2 flex flex-wrap gap-3">
-                    {docs.map((file) => (
-                        <CustomTooltip content={file.name} key={`doc-${file.name}`}>
-                            <span className=" bg-[#ccc8c5] w-22 h-22 rounded-2xl text-sm overflow-hidden p-1 flex flex-col justify-between text-stone-700 dark:bg-[#272320] dark:text-stone-200">
-
-                            </span>
-                        </CustomTooltip>
+                <div className="flex flex-wrap gap-3">
+                    {docs.map((file, index) => (
+                        <span key={`doc-${fileKey(file)}`} className="bg-[#ccc8c5] group relative w-22 h-22 rounded-2xl items-center overflow-hidden justify-center p-2 flex flex-col gap-2 text-stone-700 dark:bg-[#272320] dark:text-stone-200">
+                            <span className="h-1 w-[95%] rounded-xs animate-pulse [animation-duration:1s] bg-stone-600"></span>
+                            <span className="h-1 w-[95%] rounded-xs animate-pulse [animation-duration:1s] bg-stone-600"></span>
+                            <span className="h-1 w-[95%] rounded-xs animate-pulse [animation-duration:1s] bg-stone-600"></span>
+                            <span className="h-1 w-[95%] rounded-xs animate-pulse [animation-duration:1s] bg-stone-600"></span>
+                            <span className="h-1 w-[95%] rounded-xs animate-pulse [animation-duration:1s] bg-stone-600"></span>
+                            <button onClick={() => { }} className="absolute bg-stone-900 opacity-0 rounded-full group-hover:opacity-100 duration-200 cursor-pointer p-px right-1 top-1"><X size={16} strokeWidth={3} /></button>
+                        </span>
                     ))}
-                    {images.map((img) => (
-                        <CustomTooltip content={img.file.name} key={`img-${img.file.name}`}>
-                            <span  className="flex items-center h-22 w-22 gap-2 rounded-2xl bg-[#ccc8c5] justify-center text-xs text-stone-700 dark:bg-[#272320] dark:text-stone-200">
+                    {images.map((img, index) => (
+                        <CustomTooltip content={img.file.name} key={`img-${fileKey(img.file)}`}>
+                            <span className="flex items-center relative h-22 w-22 group gap-2 rounded-2xl bg-[#ccc8c5] justify-center text-xs text-stone-700 dark:bg-[#272320] dark:text-stone-200">
                                 <img
                                     src={img.url}
                                     alt={img.file.name}
-                                    className="h-15 w-15"
+                                    className="h-15 w-15 object-cover rounded-md"
                                 />
+                                <button onClick={() => { }} className="absolute bg-stone-900 opacity-0 group-hover:opacity-100 duration-200 cursor-pointer rounded-full p-px right-1 top-1"><X size={16} strokeWidth={3} /></button>
                             </span>
                         </CustomTooltip>
                     ))}
                 </div>
             )}
-            <div className="min-h-30 max-h-60 h-auto overflow-visible dark:bg-[#272320] bg-[#ccc8c5] rounded-4xl w-full pb-2 pt-3.5 flex flex-col">
+            <div className="min-h-30 max-h-70 h-auto gap-2 overflow-visible dark:bg-[#272320] bg-[#ccc8c5] rounded-4xl w-full pb-2 pt-3.5 flex flex-col">
                 <div className="relative px-5">
                     {prompt.length === 0 && (
                         <span className="pointer-events-none absolute left-5.25 top-4 -translate-y-1/2 text-lg text-stone-800 dark:text-stone-400">
@@ -98,10 +114,10 @@ const SearchBar = () => {
                         </span>
                     )}
                     <div className="grid">
-                        <p aria-hidden="true" className="col-start-1 row-start-1 min-h-10 max-h-40 w-full overflow-hidden whitespace-pre-wrap break-words text-transparent pointer-events-none select-none m-0 p-0">
+                        <p aria-hidden="true" className="col-start-1 row-start-1 min-h-10 max-h-50 w-full overflow-hidden whitespace-pre-wrap break-words text-transparent pointer-events-none select-none m-0 p-0">
                             {prompt || ""}
                         </p>
-                        <p contentEditable suppressContentEditableWarning role="textbox" aria-label="Ask CiviqAI" className="ask-input col-start-1 row-start-1 min-h-10 max-h-35 w-full overflow-hidden bg-transparent text-lg outline-none hover:overflow-y-auto whitespace-pre-wrap break-words m-0 p-0" onInput={(event) => normalizeText(event.currentTarget)}
+                        <p contentEditable suppressContentEditableWarning role="textbox" aria-label="Ask CiviqAI" className="ask-input col-start-1 row-start-1 min-h-10 max-h-45 w-full overflow-hidden bg-transparent text-lg outline-none hover:overflow-y-auto whitespace-pre-wrap break-words m-0 p-0" onInput={(event) => normalizeText(event.currentTarget)}
                             onPaste={(event) => {
                                 event.preventDefault();
                                 const text = event.clipboardData.getData("text/plain");

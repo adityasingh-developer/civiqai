@@ -1,6 +1,8 @@
 import { Hanken_Grotesk } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "next-themes";
+import Navbar from "@/components/Navbar";
+import "@/app/external.module.css";
 
 const font = Hanken_Grotesk({
   variable: "--font-hanken-grotesk",
@@ -20,7 +22,10 @@ export default function RootLayout({ children }) {
     <html lang="en" suppressHydrationWarning>
       <body className={`${font.variable} antialiased font-sans`}>
         <ThemeProvider attribute={"class"} enableSystem defaultTheme="dark">
-          {children}
+          <main className="min-h-screen bg-stone-300 dark:text-stone-200 text-stone-900 dark:bg-stone-900 duration-300">
+            <Navbar />
+            {children}
+          </main>
         </ThemeProvider>
       </body>
     </html>
