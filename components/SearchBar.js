@@ -114,7 +114,7 @@ const SearchBar = ({ onSend, isSending = false }) => {
 
 
     return (
-        <div className="relative mx-auto flex w-full max-w-3xl flex-col gap-3 px-1 sm:px-0 shadow-[]">
+        <div className="relative mx-auto flex w-full max-w-3xl flex-col gap-3 px-1 sm:px-0">
             {(docs.length > 0 || images.length > 0) && (
                 <div className="flex flex-wrap gap-2 sm:gap-3">
                     {docs.map((file, index) => (
@@ -139,7 +139,7 @@ const SearchBar = ({ onSend, isSending = false }) => {
                     ))}
                 </div>
             )}
-            <div className="min-h-28 max-h-70 h-auto gap-2 overflow-visible dark:bg-[#272320] shadow-[0_0_20px_1.2rem_#D6d3d1] dark:shadow-[0_0_20px_1.2rem_#1c1917] bg-[#ccc8c5] rounded-4xl w-full pb-2 pt-3.5 flex flex-col sm:min-h-30">
+            <div className="min-h-28 max-h-70 h-auto gap-2 overflow-visible dark:bg-[#272320] shadow-[0_0_5px_0.2rem_#D6d3d1] dark:shadow-[0_0_5px_0.2rem_#1c1917] bg-[#ccc8c5] rounded-4xl w-full pb-2 pt-3.5 flex flex-col sm:min-h-30">
                 <div className="relative px-4 sm:px-5">
                     {prompt.length === 0 && (
                         <span className="pointer-events-none absolute left-4.5 top-4 -translate-y-1/2 text-base text-stone-800 dark:text-stone-400 sm:left-5.25 sm:text-lg">
