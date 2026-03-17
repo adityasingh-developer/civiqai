@@ -4,3 +4,17 @@
 body {
   font-family: var(--font-hanken-grotesk), ui-sans-serif, system-ui, sans-serif;
 }
+
+@keyframes loadingBounce {
+  0% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-0.45rem);
+  }
+
+  100% {
+    transform: translateY(0);
+  }
+}

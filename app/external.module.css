@@ -24,3 +24,47 @@
 :global(.dark .ask-input) {
   scrollbar-color: rgba(231, 229, 228, 0.35) transparent;
 }
+
+:global(.profile-popover) {
+  --svgSize: 1.5rem;
+  --svgPadding: 0.5rem;
+  --navPadding: 1rem;
+  --width: 18rem;
+
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+  line-height: 0;
+}
+
+:global(.profile-popover .avatar-button) {
+  list-style: none;
+  display: inline-flex;
+  height: calc(var(--svgSize) + var(--svgPadding) * 2);
+  width: calc(var(--svgSize) + var(--svgPadding) * 2);
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  padding: 0;
+  margin: 0;
+  line-height: 1;
+}
+
+:global(.dark .profile-popover .avatar-button) {
+  background: rgba(0, 0, 0, 0.3);
+  color: #e7e5e4;
+}
+
+:global(.profile-popover .avatar-button::-webkit-details-marker) {
+  display: none;
+}
+

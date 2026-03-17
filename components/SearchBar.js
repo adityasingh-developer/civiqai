@@ -2,16 +2,19 @@
 
 import Send from "@/assets/send.svg";
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import CustomTooltip from "@/components/customTooltip";
 import { X } from "lucide-react";
 
-const SearchBar = () => {
+const SearchBar = ({ onSend, isSending = false }) => {
+    const router = useRouter();
     const [prompt, setPrompt] = useState("");
     const [docs, setDocs] = useState([]);
     const [images, setImages] = useState([]);
     const docInputRef = useRef(null);
     const imageInputRef = useRef(null);
-
+    const inputRef = useRef(null);
+    
     const fileKey = (file) =>
         `${file.name}__${file.type}__${file.size}__${file.lastModified}`;
 
@@ -75,15 +78,43 @@ const SearchBar = () => {
     const removeImage = (index) => {
         setImages((prev) => prev.filter((_, i) => i !== index));
     }
-    
+
+    const clearPrompt = () => {
+        setPrompt("");
+        if (inputRef.current) {
+            inputRef.current.textContent = "";
+        }
+    };
+
+    const sendToAi = async () => {
+        const text = prompt.trim();
+        if (!text || isSending) return;
+        if (onSend) {
+            await onSend(text);
+            clearPrompt();
+            return;
+        }
+        sessionStorage.setItem("civiqai_prompt", text);
+        router.push("/chat");
+    }
+
     useEffect(() => {
+        const saved = sessionStorage.getItem("civiqai_prompt");
+        if (saved) {
+            setPrompt(saved);
+            if (inputRef.current) {
+                inputRef.current.textContent = saved;
+            }
+            sessionStorage.removeItem("civiqai_prompt");
+        }
         return () => {
             images.forEach((img) => URL.revokeObjectURL(img.url));
         };
     }, [images]);
 
+
     return (
-        <div className="relative mx-auto flex w-full max-w-3xl flex-col gap-3">
+        <div className="relative mx-auto flex w-full max-w-3xl flex-col gap-3 shadow-[]">
             {(docs.length > 0 || images.length > 0) && (
                 <div className="flex flex-wrap gap-3">
                     {docs.map((file, index) => (
@@ -93,22 +124,22 @@ const SearchBar = () => {
                             <span className="h-1 w-[95%] rounded-xs animate-pulse [animation-duration:1s] bg-stone-600"></span>
                             <span className="h-1 w-[95%] rounded-xs animate-pulse [animation-duration:1s] bg-stone-600"></span>
                             <span className="h-1 w-[95%] rounded-xs animate-pulse [animation-duration:1s] bg-stone-600"></span>
-                            <button onClick={() => {removeDoc(index)}} className="absolute bg-stone-900 opacity-0 rounded-full group-hover:opacity-100 duration-200 cursor-pointer p-px right-1 top-1"><X size={16} strokeWidth={3} /></button>
+                            <button onClick={() => { removeDoc(index) }} className="absolute bg-stone-900 opacity-0 rounded-full group-hover:opacity-100 duration-200 cursor-pointer p-px right-1 top-1"><X size={16} strokeWidth={3} /></button>
                         </span>
                     ))}
                     {images.map((img, index) => (
-                            <span key={`img-${fileKey(img.file)}`} className="flex items-center relative h-22 w-22 group gap-2 rounded-2xl bg-[#ccc8c5] justify-center text-xs text-stone-700 dark:bg-[#272320] dark:text-stone-200">
-                                <img
-                                    src={img.url}
-                                    alt={img.file.name}
-                                    className="h-15 w-15 object-cover rounded-md"
-                                />
-                                <button onClick={() => {removeImage(index)}} className="absolute bg-stone-900 opacity-0 group-hover:opacity-100 duration-200 cursor-pointer rounded-full p-px right-1 top-1"><X size={16} strokeWidth={3} /></button>
-                            </span>
+                        <span key={`img-${fileKey(img.file)}`} className="flex items-center relative h-22 w-22 group gap-2 rounded-2xl bg-[#ccc8c5] justify-center text-xs text-stone-700 dark:bg-[#272320] dark:text-stone-200">
+                            <img
+                                src={img.url}
+                                alt={img.file.name}
+                                className="h-15 w-15 object-cover rounded-md"
+                            />
+                            <button onClick={() => { removeImage(index) }} className="absolute bg-stone-900 opacity-0 group-hover:opacity-100 duration-200 cursor-pointer rounded-full p-px right-1 top-1"><X size={16} strokeWidth={3} /></button>
+                        </span>
                     ))}
                 </div>
             )}
-            <div className="min-h-30 max-h-70 h-auto gap-2 overflow-visible dark:bg-[#272320] bg-[#ccc8c5] rounded-4xl w-full pb-2 pt-3.5 flex flex-col">
+            <div className="min-h-30 max-h-70 h-auto gap-2 overflow-visible dark:bg-[#272320]  bg-[#ccc8c5] rounded-4xl w-full pb-2 pt-3.5 flex flex-col">
                 <div className="relative px-5">
                     {prompt.length === 0 && (
                         <span className="pointer-events-none absolute left-5.25 top-4 -translate-y-1/2 text-lg text-stone-800 dark:text-stone-400">
@@ -119,7 +150,7 @@ const SearchBar = () => {
                         <p aria-hidden="true" className="col-start-1 row-start-1 min-h-10 max-h-50 w-full overflow-hidden whitespace-pre-wrap break-words text-transparent pointer-events-none select-none m-0 p-0">
                             {prompt || ""}
                         </p>
-                        <p contentEditable suppressContentEditableWarning role="textbox" aria-label="Ask CiviqAI" className="ask-input col-start-1 row-start-1 min-h-10 max-h-45 w-full overflow-hidden bg-transparent text-lg outline-none hover:overflow-y-auto whitespace-pre-wrap break-words m-0 p-0" onInput={(event) => normalizeText(event.currentTarget)}
+                        <p ref={inputRef} contentEditable suppressContentEditableWarning role="textbox" aria-label="Ask CiviqAI" className="ask-input col-start-1 row-start-1 min-h-10 max-h-45 w-full overflow-hidden bg-transparent text-lg outline-none hover:overflow-y-auto whitespace-pre-wrap break-words m-0 p-0" onInput={(event) => normalizeText(event.currentTarget)}
                             onPaste={(event) => {
                                 event.preventDefault();
                                 const text = event.clipboardData.getData("text/plain");
@@ -138,16 +169,17 @@ const SearchBar = () => {
                         </button>
                     </div>
                     <div>
-                        <CustomTooltip content={prompt.trim().length === 0 ? "Give the scheme or document, first" : "Ask"}>
-                            <span className="inline-flex">
-                                <button
-                                    disabled={prompt.trim().length === 0}
-                                    className="inline-flex h-8 w-8 items-center justify-center dark:hover:text-stone-400 hover:-rotate-27 hover:text-stone-700 duration-250 cursor-pointer text-stone-900 dark:text-stone-100 disabled:cursor-default disabled:opacity-60 disabled:hover:rotate-0 dark:disabled:hover:text-stone-100 disabled:hover:text-stone-900 disabled:pointer-events-none"
-                                >
-                                    <Send className="h-6.5 w-6.5" />
-                                </button>
-                            </span>
-                        </CustomTooltip>
+                            <CustomTooltip content={prompt.trim().length === 0 ? "Give the scheme or document, first" : "Ask"}>
+                                <span className="inline-flex">
+                                    <button
+                                        disabled={prompt.trim().length === 0 || isSending}
+                                        onClick={() => {sendToAi()}}
+                                        className="inline-flex h-8 w-8 items-center justify-center dark:hover:text-stone-400 hover:-rotate-27 hover:text-stone-700 duration-250 cursor-pointer text-stone-900 dark:text-stone-100 disabled:cursor-default disabled:opacity-60 disabled:hover:rotate-0 dark:disabled:hover:text-stone-100 disabled:hover:text-stone-900 disabled:pointer-events-none"
+                                    >
+                                        <Send className="h-6.5 w-6.5" />
+                                    </button>
+                                </span>
+                            </CustomTooltip>
                     </div>
                 </div>
             </div>
