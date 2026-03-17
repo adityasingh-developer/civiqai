@@ -3,6 +3,7 @@
 import Navbar from "@/components/Navbar";
 import SearchBar from "@/components/SearchBar";
 import LoadingDots from "@/components/LoadingDots";
+import MarkdownMessage from "@/components/MarkdownMessage";
 import { signIn, useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 
@@ -161,7 +162,7 @@ export default function ChatPage() {
     <main className="min-h-screen bg-stone-300 text-stone-900 dark:bg-stone-900 dark:text-stone-200 transition-colors duration-300">
       <Navbar />
 
-      <section className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 pb-44 pt-28">
+      <section className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 pb-44 pt-28">
 
         <div className="flex flex-col gap-4">
           {isSignedIn ? (
@@ -171,7 +172,7 @@ export default function ChatPage() {
                 className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
               >
                 <div
-                  className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm sm:max-w-[70%] ${
+                  className={`max-w-[80%] rounded-2xl px-4 py-3 text-md leading-relaxed shadow-sm sm:max-w-[70%] ${
                     msg.role === "user"
                       ? "bg-stone-900 text-stone-50 dark:bg-stone-100 dark:text-stone-900"
                       : "bg-stone-100 text-stone-800 dark:bg-stone-800 dark:text-stone-100"
@@ -180,9 +181,13 @@ export default function ChatPage() {
                   {msg.loading ? (
                     <LoadingDots className="text-stone-800 dark:text-stone-100" />
                   ) : (
-                    <p>{msg.text}</p>
+                    msg.role === "assistant" ? (
+                      <MarkdownMessage text={msg.text} />
+                    ) : (
+                      <p>{msg.text}</p>
+                    )
                   )}
-                  <div className="mt-2 text-[11px] opacity-70">{msg.time}</div>
+                  <div className="text-[11px] opacity-70">{msg.time}</div>
                 </div>
               </div>
             ))

@@ -3,7 +3,7 @@ const MODELS = [
 ];
 
 const SYSTEM_PROMPT =
-  "Only answer government schemes. If unrelated, say \"Not relevant\". Respond in simple, short, factual points. No fluff.";
+  "Only answer government schemes. If unrelated, say \"Not relevant\". Respond in simple, short, factual points. No fluff. For headings use # in starting.";
 
 async function callModel(model, messages) {
   const controller = new AbortController();

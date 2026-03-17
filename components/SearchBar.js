@@ -139,7 +139,7 @@ const SearchBar = ({ onSend, isSending = false }) => {
                     ))}
                 </div>
             )}
-            <div className="min-h-30 max-h-70 h-auto gap-2 overflow-visible dark:bg-[#272320]  bg-[#ccc8c5] rounded-4xl w-full pb-2 pt-3.5 flex flex-col">
+            <div className="min-h-30 max-h-70 h-auto gap-2 overflow-visible dark:bg-[#272320] shadow-[0_0_20px_1.2rem_#D6d3d1] dark:shadow-[0_0_20px_1.2rem_#1c1917] bg-[#ccc8c5] rounded-4xl w-full pb-2 pt-3.5 flex flex-col">
                 <div className="relative px-5">
                     {prompt.length === 0 && (
                         <span className="pointer-events-none absolute left-5.25 top-4 -translate-y-1/2 text-lg text-stone-800 dark:text-stone-400">
