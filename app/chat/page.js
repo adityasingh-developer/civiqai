@@ -5,7 +5,8 @@ import SearchBar from "@/components/SearchBar";
 import LoadingDots from "@/components/LoadingDots";
 import MarkdownMessage from "@/components/MarkdownMessage";
 import { signIn, useSession } from "next-auth/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Copy } from "lucide-react";
 
 const HISTORY_KEY = "civiqai_history";
 
@@ -43,6 +44,8 @@ export default function ChatPage() {
   const [history, setHistory] = useState([]);
   const [messages, setMessages] = useState([]);
   const [isSending, setIsSending] = useState(false);
+  const endRef = useRef(null);
+  const [copiedId, setCopiedId] = useState(null);
 
   useEffect(() => {
     const raw = localStorage.getItem(HISTORY_KEY);
@@ -76,6 +79,24 @@ export default function ChatPage() {
       console.error("Failed to read history", err);
     }
   }, []);
+
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    const timer = setTimeout(() => {
+      endRef.current?.scrollIntoView({ behavior: "auto", block: "end" });
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [status, messages.length]);
+
+  const handleCopy = async (msg) => {
+    try {
+      await navigator.clipboard.writeText(msg.text || "");
+      setCopiedId(msg.id);
+      setTimeout(() => setCopiedId(null), 1200);
+    } catch (err) {
+      console.error("Copy failed", err);
+    }
+  };
 
   const handleSend = async (text) => {
     setIsSending(true);
@@ -162,7 +183,7 @@ export default function ChatPage() {
     <main className="min-h-screen bg-stone-300 text-stone-900 dark:bg-stone-900 dark:text-stone-200 transition-colors duration-300">
       <Navbar />
 
-      <section className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 pb-44 pt-28">
+      <section className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pb-44 pt-24 sm:px-6 sm:pt-28">
 
         <div className="flex flex-col gap-4">
           {isSignedIn ? (
@@ -172,7 +193,7 @@ export default function ChatPage() {
                 className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
               >
                 <div
-                  className={`max-w-[80%] rounded-2xl px-4 py-3 text-md leading-relaxed shadow-sm sm:max-w-[70%] ${
+                  className={`group relative max-w-[92%] rounded-2xl px-4 py-3 text-md leading-relaxed shadow-sm sm:max-w-[70%] ${
                     msg.role === "user"
                       ? "bg-stone-900 text-stone-50 dark:bg-stone-100 dark:text-stone-900"
                       : "bg-stone-100 text-stone-800 dark:bg-stone-800 dark:text-stone-100"
@@ -188,6 +209,12 @@ export default function ChatPage() {
                     )
                   )}
                   <div className="text-[11px] opacity-70">{msg.time}</div>
+                  {!msg.loading && (
+                    <button type="button" onClick={() => handleCopy(msg)} className="absolute right-3 top-3 inline-flex items-center justify-center rounded-full bg-stone-200/70 p-1.5 text-stone-700 opacity-0 transition group-hover:opacity-100 dark:bg-stone-700/90 dark:text-stone-100 cursor-pointer" aria-label={copiedId === msg.id ? "Copied" : "Copy"}
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </div>
               </div>
             ))
@@ -208,11 +235,12 @@ export default function ChatPage() {
               </button>
             </div>
           )}
+          <div ref={endRef} className="scroll-mb-[120px]" />
         </div>
       </section>
 
       {isSignedIn && (
-        <div className="fixed bottom-6 left-1/2 w-full -translate-x-1/2 px-6">
+        <div className="fixed bottom-4 left-1/2 w-full -translate-x-1/2 px-4 sm:bottom-6 sm:px-6">
           <SearchBar onSend={handleSend} isSending={isSending} />
         </div>
       )}

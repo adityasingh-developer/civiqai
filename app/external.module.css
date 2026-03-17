@@ -68,3 +68,6 @@
   display: none;
 }
 
+.nav {
+  corner-shape: squircle;
+}
