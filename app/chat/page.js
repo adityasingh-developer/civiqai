@@ -4,6 +4,7 @@ import Navbar from "@/components/Navbar";
 import SearchBar from "@/components/SearchBar";
 import LoadingDots from "@/components/LoadingDots";
 import MarkdownMessage from "@/components/MarkdownMessage";
+import { readUserCache, writeUserCache } from "@/lib/localCache";
 import { signIn, useSession } from "next-auth/react";
 import { useEffect, useRef, useState } from "react";
 import { Bookmark, BookmarkCheck, Copy } from "lucide-react";
@@ -50,9 +51,11 @@ const buildMessages = (history, savedLookup) => {
 export default function ChatPage() {
   const { data: session, status } = useSession();
   const isSignedIn = Boolean(session?.user);
+  const userEmail = session?.user?.email || "";
   const [history, setHistory] = useState([]);
   const [messages, setMessages] = useState([]);
   const [savedLookup, setSavedLookup] = useState(new Set());
+  const [savedMessages, setSavedMessages] = useState([]);
   const [isSending, setIsSending] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [copiedId, setCopiedId] = useState(null);
@@ -64,14 +67,29 @@ export default function ChatPage() {
       setHistory([]);
       setMessages([]);
       setSavedLookup(new Set());
+      setSavedMessages([]);
       setIsLoadingHistory(false);
       return;
     }
 
     let isMounted = true;
+    const cachedHistory = readUserCache("chat-cache", userEmail);
+    const cachedSavedMessages = readUserCache("saved-cache", userEmail);
+
+    if (cachedHistory.length || cachedSavedMessages.length) {
+      const cachedSavedLookup = new Set(
+        cachedSavedMessages.map((item) => savedKey(item.chatId, item.role))
+      );
+      setHistory(cachedHistory);
+      setSavedMessages(cachedSavedMessages);
+      setSavedLookup(cachedSavedLookup);
+      setMessages(buildMessages(cachedHistory, cachedSavedLookup));
+      setIsLoadingHistory(false);
+    } else {
+      setIsLoadingHistory(true);
+    }
 
     const loadUserData = async () => {
-      setIsLoadingHistory(true);
       try {
         const res = await fetch("/api/user/me", { cache: "no-store" });
         const data = await res.json();
@@ -83,13 +101,17 @@ export default function ChatPage() {
         if (!isMounted) return;
 
         const nextHistory = Array.isArray(data?.chats) ? data.chats : [];
+        const nextSavedMessages = Array.isArray(data?.savedMessages)
+          ? data.savedMessages
+          : [];
         const nextSaved = new Set(
-          (Array.isArray(data?.savedMessages) ? data.savedMessages : []).map(
-            (item) => savedKey(item.chatId, item.role)
-          )
+          nextSavedMessages.map((item) => savedKey(item.chatId, item.role))
         );
 
+        writeUserCache("chat-cache", userEmail, nextHistory);
+        writeUserCache("saved-cache", userEmail, nextSavedMessages);
         setHistory(nextHistory);
+        setSavedMessages(nextSavedMessages);
         setSavedLookup(nextSaved);
         setMessages(buildMessages(nextHistory, nextSaved));
       } catch (error) {
@@ -106,7 +128,7 @@ export default function ChatPage() {
     return () => {
       isMounted = false;
     };
-  }, [status]);
+  }, [status, userEmail]);
 
   useEffect(() => {
     if (status !== "authenticated") return;
@@ -149,6 +171,29 @@ export default function ChatPage() {
       if (!res.ok) {
         throw new Error(data?.error || "Failed to update saved message");
       }
+
+      const nextSavedMessages = isSaved
+        ? savedMessages.filter(
+            (item) =>
+              !(
+                String(item.chatId) === String(msg.chatId) &&
+                item.role === msg.role
+              )
+          )
+        : [
+            ...savedMessages,
+            {
+              id: data?.savedMessage?.id || `${msg.chatId}:${msg.role}`,
+              chatId: msg.chatId,
+              role: msg.role,
+              text: msg.text,
+              createdAt:
+                data?.savedMessage?.createdAt || new Date().toISOString(),
+            },
+          ];
+
+      setSavedMessages(nextSavedMessages);
+      writeUserCache("saved-cache", userEmail, nextSavedMessages);
 
       setSavedLookup((prev) => {
         const next = new Set(prev);
@@ -242,7 +287,11 @@ export default function ChatPage() {
         assistantTime: chat.assistantTime,
       };
 
-      setHistory((prev) => [...prev, nextHistoryItem]);
+      setHistory((prev) => {
+        const nextHistory = [...prev, nextHistoryItem];
+        writeUserCache("chat-cache", userEmail, nextHistory);
+        return nextHistory;
+      });
       setMessages((prev) => {
         const withoutTemp = prev.filter(
           (msg) => msg.id !== tempUserId && msg.id !== tempAssistantId
