@@ -67,7 +67,3 @@
 :global(.profile-popover .avatar-button::-webkit-details-marker) {
   display: none;
 }
-
-.nav {
-  corner-shape: squircle;
-}
