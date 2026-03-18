@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Navbar from "@/components/Navbar";
 import SearchBar from "@/components/SearchBar";
@@ -6,9 +6,7 @@ import LoadingDots from "@/components/LoadingDots";
 import MarkdownMessage from "@/components/MarkdownMessage";
 import { signIn, useSession } from "next-auth/react";
 import { useEffect, useRef, useState } from "react";
-import { Copy } from "lucide-react";
-
-const HISTORY_KEY = "civiqai_history";
+import { Bookmark, BookmarkCheck, Copy } from "lucide-react";
 
 const formatTime = (timestamp) =>
   new Date(timestamp).toLocaleTimeString([], {
@@ -16,25 +14,36 @@ const formatTime = (timestamp) =>
     minute: "2-digit",
   });
 
-const buildMessages = (history) => {
+const savedKey = (chatId, role) => `${chatId}:${role}`;
+
+const buildMessages = (history, savedLookup) => {
   const list = [];
+
   history.forEach((item, index) => {
     const userTimestamp = item.userTime ?? item.time ?? Date.now();
     const assistantTimestamp =
       item.assistantTime ?? item.time ?? userTimestamp;
+    const chatId = item.id || `chat-${index}`;
+
     list.push({
-      id: `u-${index}`,
+      id: `u-${chatId}`,
+      chatId,
       role: "user",
       text: item.input,
       time: formatTime(userTimestamp),
+      saved: savedLookup.has(savedKey(chatId, "user")),
     });
+
     list.push({
-      id: `a-${index}`,
+      id: `a-${chatId}`,
+      chatId,
       role: "assistant",
       text: item.answer,
       time: formatTime(assistantTimestamp),
+      saved: savedLookup.has(savedKey(chatId, "assistant")),
     });
   });
+
   return list;
 };
 
@@ -43,42 +52,61 @@ export default function ChatPage() {
   const isSignedIn = Boolean(session?.user);
   const [history, setHistory] = useState([]);
   const [messages, setMessages] = useState([]);
+  const [savedLookup, setSavedLookup] = useState(new Set());
   const [isSending, setIsSending] = useState(false);
-  const endRef = useRef(null);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [copiedId, setCopiedId] = useState(null);
+  const [savingIds, setSavingIds] = useState(new Set());
+  const endRef = useRef(null);
 
   useEffect(() => {
-    const raw = localStorage.getItem(HISTORY_KEY);
-    if (!raw) return;
-    try {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        const base = Date.now();
-        let didNormalize = false;
-        const normalized = parsed.map((item, index) => {
-          const userTime =
-            item.userTime ?? item.time ?? base + index * 1000;
-          const assistantTime =
-            item.assistantTime ?? item.time ?? userTime + 500;
-          if (item.userTime == null || item.assistantTime == null) {
-            didNormalize = true;
-          }
-          return {
-            ...item,
-            userTime,
-            assistantTime,
-          };
-        });
-        if (didNormalize) {
-          localStorage.setItem(HISTORY_KEY, JSON.stringify(normalized));
-        }
-        setHistory(normalized);
-        setMessages(buildMessages(normalized));
-      }
-    } catch (err) {
-      console.error("Failed to read history", err);
+    if (status !== "authenticated") {
+      setHistory([]);
+      setMessages([]);
+      setSavedLookup(new Set());
+      setIsLoadingHistory(false);
+      return;
     }
-  }, []);
+
+    let isMounted = true;
+
+    const loadUserData = async () => {
+      setIsLoadingHistory(true);
+      try {
+        const res = await fetch("/api/user/me", { cache: "no-store" });
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data?.error || "Failed to load chats");
+        }
+
+        if (!isMounted) return;
+
+        const nextHistory = Array.isArray(data?.chats) ? data.chats : [];
+        const nextSaved = new Set(
+          (Array.isArray(data?.savedMessages) ? data.savedMessages : []).map(
+            (item) => savedKey(item.chatId, item.role)
+          )
+        );
+
+        setHistory(nextHistory);
+        setSavedLookup(nextSaved);
+        setMessages(buildMessages(nextHistory, nextSaved));
+      } catch (error) {
+        console.error("Failed to load user data", error);
+      } finally {
+        if (isMounted) {
+          setIsLoadingHistory(false);
+        }
+      }
+    };
+
+    loadUserData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [status]);
 
   useEffect(() => {
     if (status !== "authenticated") return;
@@ -98,80 +126,136 @@ export default function ChatPage() {
     }
   };
 
+  const handleToggleSaved = async (msg) => {
+    if (!msg.chatId || msg.loading) return;
+
+    const key = savedKey(msg.chatId, msg.role);
+    const isSaved = savedLookup.has(key);
+
+    setSavingIds((prev) => new Set(prev).add(msg.id));
+
+    try {
+      const res = await fetch("/api/user/saved", {
+        method: isSaved ? "DELETE" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chatId: msg.chatId,
+          role: msg.role,
+          text: msg.text,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error || "Failed to update saved message");
+      }
+
+      setSavedLookup((prev) => {
+        const next = new Set(prev);
+        if (isSaved) {
+          next.delete(key);
+        } else {
+          next.add(key);
+        }
+        return next;
+      });
+
+      setMessages((prev) =>
+        prev.map((item) =>
+          item.id === msg.id ? { ...item, saved: !isSaved } : item
+        )
+      );
+    } catch (error) {
+      console.error("Save toggle failed", error);
+    } finally {
+      setSavingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(msg.id);
+        return next;
+      });
+    }
+  };
+
   const handleSend = async (text) => {
     setIsSending(true);
     const userTimestamp = Date.now();
-    const time = formatTime(userTimestamp);
+    const userTime = formatTime(userTimestamp);
     const safeText = text.slice(0, 4000);
-    const userMsg = { id: `u-${Date.now()}`, role: "user", text: safeText, time };
-    const botId = `a-${Date.now() + 1}`;
+    const tempChatId = `temp-${Date.now()}`;
+    const tempUserId = `u-${tempChatId}`;
+    const tempAssistantId = `a-${tempChatId}`;
+
     setMessages((prev) => [
       ...prev,
-      userMsg,
-      { id: botId, role: "assistant", text: "", time, loading: true },
+      {
+        id: tempUserId,
+        chatId: tempChatId,
+        role: "user",
+        text: safeText,
+        time: userTime,
+        saved: false,
+      },
+      {
+        id: tempAssistantId,
+        chatId: tempChatId,
+        role: "assistant",
+        text: "",
+        time: userTime,
+        loading: true,
+        saved: false,
+      },
     ]);
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: [
-            {
-              role: "user",
-              content: safeText,
-            },
-          ],
+          message: safeText,
+          history: messages
+            .filter((msg) => !msg.loading)
+            .map((msg) => ({ role: msg.role, content: msg.text }))
+            .slice(-12),
         }),
       });
 
+      const data = await res.json();
+
       if (!res.ok) {
-        const errorText = await res.text();
-        console.log(errorText);
-        const message = errorText || "Sorry, something went wrong.";
+        const errorMessage = data?.error || "Sorry, something went wrong.";
         setMessages((prev) =>
           prev.map((msg) =>
-            msg.id === botId ? { ...msg, text: message, loading: false } : msg,
-          ),
+            msg.id === tempAssistantId
+              ? { ...msg, text: errorMessage, loading: false }
+              : msg
+          )
         );
         return;
       }
 
-      const answer = await res.text();
-      const finalAnswer =
-        answer.trim().length > 0 ? answer : "Sorry, something went wrong.";
-      const assistantTimestamp = Date.now();
-      const assistantTime = formatTime(assistantTimestamp);
+      const chat = data.chat;
+      const nextHistoryItem = {
+        id: chat.id,
+        input: chat.input,
+        answer: data.answer,
+        userTime: chat.userTime,
+        assistantTime: chat.assistantTime,
+      };
 
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === botId
-            ? { ...msg, text: finalAnswer, loading: false, time: assistantTime }
-            : msg,
-        ),
-      );
-
-      setHistory((prev) => {
-        const next = [
-          ...prev,
-          {
-            input: text,
-            answer: finalAnswer,
-            userTime: userTimestamp,
-            assistantTime: assistantTimestamp,
-          },
-        ];
-        localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
-        return next;
+      setHistory((prev) => [...prev, nextHistoryItem]);
+      setMessages((prev) => {
+        const withoutTemp = prev.filter(
+          (msg) => msg.id !== tempUserId && msg.id !== tempAssistantId
+        );
+        return [...withoutTemp, ...buildMessages([nextHistoryItem], savedLookup)];
       });
     } catch (err) {
       setMessages((prev) =>
         prev.map((msg) =>
-          msg.id === botId
+          msg.id === tempAssistantId
             ? { ...msg, text: "Sorry, something went wrong.", loading: false }
-            : msg,
-        ),
+            : msg
+        )
       );
       console.error(err);
     } finally {
@@ -180,52 +264,82 @@ export default function ChatPage() {
   };
 
   return (
-    <main className="min-h-screen bg-stone-300 text-stone-900 dark:bg-stone-900 dark:text-stone-200 transition-colors duration-300">
+    <main className="min-h-screen bg-stone-300 text-stone-900 transition-colors duration-300 dark:bg-stone-900 dark:text-stone-200">
       <Navbar />
 
       <section className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pb-44 pt-24 sm:px-6 sm:pt-28">
-
         <div className="flex flex-col gap-4">
           {isSignedIn ? (
-            messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-              >
+            isLoadingHistory ? (
+              <div className="flex justify-center py-10">
+                <LoadingDots className="text-stone-800 dark:text-stone-100" />
+              </div>
+            ) : messages.length === 0 ? (
+              <div className="rounded-2xl border border-stone-200/70 bg-white/70 p-5 text-sm text-stone-700 shadow-sm backdrop-blur dark:border-stone-700/70 dark:bg-stone-900/60 dark:text-stone-200">
+                <div className="text-2xl font-semibold">No chats yet</div>
+                <p className="mt-1 text-lg">Start a conversation and save any message you want to keep.</p>
+              </div>
+            ) : (
+              messages.map((msg) => (
                 <div
-                  className={`group relative max-w-[92%] rounded-2xl px-4 py-3 text-md leading-relaxed shadow-sm sm:max-w-[70%] ${
-                    msg.role === "user"
-                      ? "bg-stone-900 text-stone-50 dark:bg-stone-100 dark:text-stone-900"
-                      : "bg-stone-100 text-stone-800 dark:bg-stone-800 dark:text-stone-100"
-                  }`}
+                  key={msg.id}
+                  className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                 >
-                  {msg.loading ? (
-                    <LoadingDots className="text-stone-800 dark:text-stone-100" />
-                  ) : (
-                    msg.role === "assistant" ? (
+                  <div
+                    className={`group relative max-w-[92%] rounded-2xl px-4 py-3 text-md leading-relaxed shadow-sm sm:max-w-[70%] ${
+                      msg.role === "user"
+                        ? "bg-stone-900 text-stone-50 dark:bg-stone-100 dark:text-stone-900"
+                        : "bg-stone-100 text-stone-800 dark:bg-stone-800 dark:text-stone-100"
+                    }`}
+                  >
+                    {msg.loading ? (
+                      <LoadingDots className="text-stone-800 dark:text-stone-100" />
+                    ) : msg.role === "assistant" ? (
                       <MarkdownMessage text={msg.text} />
                     ) : (
                       <p>{msg.text}</p>
-                    )
-                  )}
-                  <div className="text-[11px] opacity-70">{msg.time}</div>
-                  {!msg.loading && (
-                    <button type="button" onClick={() => handleCopy(msg)} className="absolute right-3 top-3 inline-flex items-center justify-center rounded-full bg-stone-200/70 p-1.5 text-stone-700 opacity-0 transition group-hover:opacity-100 dark:bg-stone-700/90 dark:text-stone-100 cursor-pointer" aria-label={copiedId === msg.id ? "Copied" : "Copy"}
-                    >
-                      <Copy className="h-3.5 w-3.5" />
-                    </button>
-                  )}
+                    )}
+                    <div className="mt-2 flex items-center gap-2 text-[11px] opacity-70">
+                      <span>{msg.time}</span>
+                      {msg.saved ? <span>Saved</span> : null}
+                    </div>
+                    {!msg.loading && (
+                      <div className="absolute right-3 top-3 flex items-center gap-2 opacity-0 transition group-hover:opacity-100">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleSaved(msg)}
+                          className="inline-flex items-center justify-center rounded-full bg-stone-200/70 p-1.5 text-stone-700 transition dark:bg-stone-700/90 dark:text-stone-100 cursor-pointer"
+                          aria-label={msg.saved ? "Unsave message" : "Save message"}
+                          disabled={savingIds.has(msg.id)}
+                        >
+                          {msg.saved ? (
+                            <BookmarkCheck className="h-3.5 w-3.5" />
+                          ) : (
+                            <Bookmark className="h-3.5 w-3.5" />
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleCopy(msg)}
+                          className="inline-flex items-center justify-center rounded-full bg-stone-200/70 p-1.5 text-stone-700 transition dark:bg-stone-700/90 dark:text-stone-100 cursor-pointer"
+                          aria-label={copiedId === msg.id ? "Copied" : "Copy"}
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))
+              ))
+            )
           ) : (
             <div className="rounded-2xl border border-stone-200/70 bg-white/70 p-5 text-sm text-stone-700 shadow-sm backdrop-blur dark:border-stone-700/70 dark:bg-stone-900/60 dark:text-stone-200">
-              <div className="font-semibold text-2xl">Sign in required</div>
+              <div className="text-2xl font-semibold">Sign in required</div>
               <p className="mt-1 text-lg">Please sign in to start chatting.</p>
               <button
                 type="button"
                 onClick={() => signIn()}
-                className="mt-3 inline-flex items-center gap-2 rounded-full bg-stone-900 px-4 py-1.5 text-lg font-medium text-stone-50 shadow-sm duration-200 hover:bg-stone-800 dark:hover:bg-stone-700 hover:dark:text-white dark:bg-stone-100 dark:text-stone-900 cursor-pointer"
+                className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-full bg-stone-900 px-4 py-1.5 text-lg font-medium text-stone-50 shadow-sm duration-200 hover:bg-stone-800 dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-stone-700 hover:dark:text-white"
               >
                 {status === "loading" ? (
                   <LoadingDots className="text-stone-900 dark:text-stone-100" />

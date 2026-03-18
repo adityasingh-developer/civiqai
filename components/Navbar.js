@@ -14,6 +14,12 @@ const Navbar = ({ userImageUrl = "", userName = "User" }) => {
   const displayName = session?.user?.name || session?.user?.email || userName;
   const imageUrl = session?.user?.image || userImageUrl;
   const initial = displayName?.slice(0, 1)?.toUpperCase() || "U";
+  const pageTitle =
+    pathname === "/chat"
+      ? "User Chat"
+      : pathname === "/saved"
+        ? "Saved Messages"
+        : "";
   return (
     <nav className="fixed inset-x-0 top-0 z-100000">
       <div className="grid grid-cols-[1fr_auto_1fr] items-start">
@@ -21,7 +27,7 @@ const Navbar = ({ userImageUrl = "", userName = "User" }) => {
         <div className="relative w-[min(620px,92vw)] duration-300 h-12 bg-stone-800 dark:bg-stone-400 rounded-b-4xl before:duration-300 after:duration-300 before:content-[''] before:absolute before:top-0 dark:before:-top-px before:-left-7.75 before:w-8 before:h-8 before:z-10 dark:before:[background-image:radial-gradient(circle_at_0%_100%,_transparent_32px,_#a6a09b_32px)] before:[background-image:radial-gradient(circle_at_0%_100%,_transparent_32px,_#292524_32px)] after:content-[''] after:absolute after:top-0 dark:after:-top-px after:-right-7.75 after:w-8 after:h-8 dark:after:[background-image:radial-gradient(circle_at_100%_100%,_transparent_32px,_#a6a09b_32px)] after:[background-image:radial-gradient(circle_at_100%_100%,_transparent_32px,_#292524_32px)] dark:text-[#1e1a17] text-white shadow-[0_0_10px_0.4rem_#D6d3d1] dark:shadow-[0_0_10px_0.4rem_#1c1917] sm:h-13 sm:w-[min(620px,70vw)]">
           <div className="grid h-full grid-cols-[1fr_auto_1fr] items-center px-3 sm:px-6">
             <div className="justify-self-start" >
-              {pathname === '/chat' ? <h1 className="text-sm font-bold sm:text-xl">User Chat</h1> : ""}</div>
+              {pageTitle ? <h1 className="text-sm font-bold sm:text-xl">{pageTitle}</h1> : ""}</div>
             <div className="justify-self-center">
               <Link href={"/"}>
                 <Logo className="h-8 w-8 sm:h-10 sm:w-10" />
@@ -72,6 +78,14 @@ const Navbar = ({ userImageUrl = "", userName = "User" }) => {
                             className="block rounded-lg px-3 py-2 hover:bg-stone-200 dark:hover:bg-stone-700"
                           >
                             History
+                          </Link>
+                        </li>
+                        <li>
+                          <Link
+                            href="/saved"
+                            className="block rounded-lg px-3 py-2 hover:bg-stone-200 dark:hover:bg-stone-700"
+                          >
+                            Saved messages
                           </Link>
                         </li>
                         <li>
