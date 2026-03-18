@@ -5,31 +5,7 @@ const groq = new Groq({
 });
 
 const SYSTEM_PROMPT =
-  "You only answer about real government/public schemes, policies, or programs from any country. If the user asks about people, characters, places, companies(can answer company job recruitments), or anything unrelated, reply exactly: I'm only made for schemes or programs only. If unsure or not real, reply exactly: Not found. Respond in simple, short, factual points (500-1000 chars max). Use # for headings. Do not add extra commentary.";
-
-const SCHEME_KEYWORDS = [
-  "scheme",
-  "policy",
-  "program",
-  "programme",
-  "benefit",
-  "subsidy",
-  "grant",
-  "pension",
-  "welfare",
-  "eligibility",
-  "apply",
-  "application",
-  "government",
-  "ministry",
-  "youth",
-  "farmer",
-  "employment",
-  "health",
-  "education",
-  "housing",
-  "insurance",
-];
+  "You only answer about real government/public schemes, policies, or programs from any country. If the user asks about people, characters, places, companies (you may answer about company job recruitments), or anything unrelated, reply exactly: Not relevant. If user asks who are you, reply exactly: Im CiviqAi. If unsure or not real, reply exactly: Not found. Respond in simple, short, factual points (500-1000 chars max). Use # for headings. Do not add extra commentary.";
 
 export async function POST(req) {
   try {
@@ -52,13 +28,6 @@ export async function POST(req) {
       },
       ...incomingMessages,
     ];
-
-    const lastUser = incomingMessages[incomingMessages.length - 1];
-    const userText = `${lastUser?.content || ""}`.toLowerCase();
-    const looksRelevant = SCHEME_KEYWORDS.some((word) => userText.includes(word));
-    if (!looksRelevant) {
-      return new Response("Not relevant", { status: 200 });
-    }
 
     const stream = await groq.chat.completions.create({
       model: "llama-3.1-8b-instant",
