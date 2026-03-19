@@ -1,14 +1,19 @@
 "use client";
 
-import { Image as ImageIcon } from "lucide-react";
+import { FileText, Image as ImageIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { getCachedImageBlob } from "@/lib/browserImageCache";
 
 function ImageAttachmentCard({ image }) {
-  const [imageUrl, setImageUrl] = useState(null);
+  const isImage = image?.mimeType?.startsWith("image/");
+  const [cachedImageUrl, setCachedImageUrl] = useState(null);
 
   useEffect(() => {
+    if (!isImage || image.previewUrl) {
+      return undefined;
+    }
+
     let isMounted = true;
     let objectUrl = null;
 
@@ -20,7 +25,7 @@ function ImageAttachmentCard({ image }) {
       }
 
       objectUrl = URL.createObjectURL(blob);
-      setImageUrl(objectUrl);
+      setCachedImageUrl(objectUrl);
     };
 
     loadImage();
@@ -31,21 +36,27 @@ function ImageAttachmentCard({ image }) {
         URL.revokeObjectURL(objectUrl);
       }
     };
-  }, [image.cacheKey]);
+  }, [image.cacheKey, image.previewUrl, isImage]);
 
-  if (imageUrl) {
+  const imageUrl = isImage ? image.previewUrl || cachedImageUrl : null;
+
+  if (isImage && imageUrl) {
     return (
       <img
         src={imageUrl}
         alt={image.name}
-        className="h-18 w-18 rounded-xl object-cover sm:h-22 sm:w-22"
+        className="block h-32 w-32 rounded-lg object-cover sm:h-36 sm:w-36"
       />
     );
   }
 
   return (
-    <div className="flex min-h-14 min-w-28 items-center gap-2 rounded-xl bg-stone-200/80 px-3 py-2 text-xs text-stone-700 dark:bg-stone-700/70 dark:text-stone-100">
-      <ImageIcon className="h-4 w-4 shrink-0" />
+    <div className="flex min-h-18 min-w-32 items-center gap-2 rounded-lg bg-stone-200/80 px-3 py-2 text-xs text-stone-700 dark:bg-stone-700/70 dark:text-stone-100">
+      {isImage ? (
+        <ImageIcon className="h-4 w-4 shrink-0" />
+      ) : (
+        <FileText className="h-4 w-4 shrink-0" />
+      )}
       <span className="max-w-36 truncate">{image.name}</span>
     </div>
   );
@@ -57,7 +68,7 @@ export default function MessageAttachments({ images = [] }) {
   }
 
   return (
-    <div className="mb-3 flex flex-wrap gap-2">
+    <div className="mb-1.5 flex flex-wrap gap-1.5">
       {images.map((image) => (
         <ImageAttachmentCard
           key={image.cacheKey || `${image.name}-${image.mimeType}`}

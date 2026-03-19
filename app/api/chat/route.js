@@ -86,7 +86,7 @@ export async function POST(req) {
         ? message.trim()
         : "";
     const finalMessage =
-      userInput || (images.length > 0 ? "Analyze this image." : "");
+      userInput || (images.length > 0 ? "Analyze this attachment." : "");
     const promptImages = images
       .filter((image) => image?.cacheKey && image?.name && image?.mimeType)
       .map((image) => ({

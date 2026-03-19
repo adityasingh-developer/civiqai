@@ -1,8 +1,8 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { X } from "lucide-react";
+import { FileText, X } from "lucide-react";
 
 import Send from "@/assets/send.svg";
 import CustomTooltip from "@/components/customTooltip";
@@ -16,6 +16,8 @@ import {
 } from "@/lib/browserImageCache";
 
 const PROMPT_SESSION_KEY = "civiqai_prompt";
+const IMAGE_TYPES = ["image/png", "image/jpeg"];
+const DOCUMENT_TYPES = ["application/pdf", "text/plain"];
 
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
@@ -76,6 +78,7 @@ export default function SearchBar({ onSend, isSending = false }) {
   );
   const [images, setImages] = useState([]);
   const imageInputRef = useRef(null);
+  const documentInputRef = useRef(null);
   const inputRef = useRef(null);
 
   const fileKey = (file) =>
@@ -118,13 +121,35 @@ export default function SearchBar({ onSend, isSending = false }) {
 
   const onPickImages = (event) => {
     const files = Array.from(event.target.files || []);
-    const validImages = files.filter((file) =>
-      ["image/png", "image/jpeg"].includes(file.type)
-    );
+    const validImages = files.filter((file) => IMAGE_TYPES.includes(file.type));
     const existing = new Set(
       images.map((image, index) => imageKey(image, index))
     );
     const nextImages = validImages
+      .filter((file) => !existing.has(fileKey(file)))
+      .map((file) => ({
+        id: fileKey(file),
+        file,
+        cacheKey: null,
+        name: file.name,
+        type: file.type,
+        url: URL.createObjectURL(file),
+        isObjectUrl: true,
+      }));
+
+    setImages((prev) => [...prev, ...nextImages]);
+    event.target.value = "";
+  };
+
+  const onPickDocuments = (event) => {
+    const files = Array.from(event.target.files || []);
+    const validDocuments = files.filter((file) =>
+      DOCUMENT_TYPES.includes(file.type)
+    );
+    const existing = new Set(
+      images.map((image, index) => imageKey(image, index))
+    );
+    const nextImages = validDocuments
       .filter((file) => !existing.has(fileKey(file)))
       .map((file) => ({
         id: fileKey(file),
@@ -180,6 +205,7 @@ export default function SearchBar({ onSend, isSending = false }) {
             name: cachedImage.name,
             mimeType: cachedImage.mimeType,
             data: await fileToBase64(image.file),
+            previewUrl: image.url || null,
           };
         }
 
@@ -197,6 +223,7 @@ export default function SearchBar({ onSend, isSending = false }) {
           name: image.name || `image-${index + 1}`,
           mimeType: image.type,
           data,
+          previewUrl: image.url || null,
         };
       })
     );
@@ -268,27 +295,24 @@ export default function SearchBar({ onSend, isSending = false }) {
   const canSend = prompt.trim().length > 0 || images.length > 0;
 
   return (
-    <div className="relative mx-auto flex w-full max-w-3xl flex-col gap-3 px-1 sm:px-0">
+    <div className="relative flex w-full flex-col gap-3">
       {images.length > 0 && (
-        <div className="flex flex-wrap gap-2 sm:gap-3">
+        <div className="mx-auto flex w-full max-w-3xl flex-wrap gap-1.5 px-1 sm:gap-2 sm:px-0">
           {images.map((image, index) => (
             <span
               key={`img-${imageKey(image, index)}`}
-              className="group relative flex h-18 w-18 items-center justify-center gap-2 rounded-2xl bg-[#ccc8c5] text-xs text-stone-700 dark:bg-[#272320] dark:text-stone-200 sm:h-22 sm:w-22"
+              className="group relative flex h-16.5 w-16.5 items-center justify-center rounded-2xl bg-[#ccc8c5] text-xs text-stone-700 dark:bg-[#35302c] dark:text-stone-200 sm:h-20.5 sm:w-20.5"
             >
-              {image.url ? (
-                <img
-                  src={image.url}
-                  alt={image.name}
-                  className="h-12 w-12 rounded-md object-cover sm:h-15 sm:w-15"
+              {image.type?.startsWith("image/") && image.url ? (
+                <img src={image.url} alt={image.name} className="h-14 w-14 rounded-xl object-cover sm:h-18 sm:w-18"
                 />
               ) : (
-                <span className="max-w-14 truncate text-center">{image.name}</span>
+                <span className="flex max-w-16 flex-col items-center gap-1 text-center">
+                  <FileText className="h-5 w-5 shrink-0" />
+                  <span className="w-full truncate">{image.name}</span>
+                </span>
               )}
-              <button
-                type="button"
-                onClick={() => removeImage(index)}
-                className="absolute right-1 top-1 cursor-pointer rounded-full bg-stone-900 p-px opacity-0 duration-200 group-hover:opacity-100"
+              <button type="button" onClick={() => removeImage(index)} className="absolute right-1 top-1 cursor-pointer rounded-full bg-stone-900 p-px opacity-0 duration-200 group-hover:opacity-100"
               >
                 <X size={16} strokeWidth={3} />
               </button>
@@ -297,64 +321,87 @@ export default function SearchBar({ onSend, isSending = false }) {
         </div>
       )}
 
-      <div className="flex h-auto min-h-28 max-h-70 w-full flex-col gap-2 overflow-visible rounded-4xl bg-[#ccc8c5] pb-2 pt-3.5 shadow-[0_0_5px_0.2rem_#D6d3d1] dark:bg-[#272320] dark:shadow-[0_0_5px_0.2rem_#1c1917] sm:min-h-30">
-        <div className="relative px-4 sm:px-5">
-          {prompt.length === 0 && (
-            <span className="pointer-events-none absolute left-4.5 top-4 -translate-y-1/2 text-base text-stone-800 dark:text-stone-400 sm:left-5.25 sm:text-lg">
-              Ask CiviqAI....
-            </span>
-          )}
-
-          <div className="grid">
-            <p
-              aria-hidden="true"
-              className="pointer-events-none col-start-1 row-start-1 m-0 min-h-10 max-h-50 w-full select-none overflow-hidden whitespace-pre-wrap break-words p-0 text-base text-transparent sm:text-lg"
-            >
-              {prompt || ""}
-            </p>
-            <p
-              ref={inputRef}
-              contentEditable
-              suppressContentEditableWarning
-              role="textbox"
-              aria-label="Ask CiviqAI"
-              className="ask-input col-start-1 row-start-1 m-0 min-h-10 max-h-45 w-full overflow-hidden whitespace-pre-wrap break-words bg-transparent p-0 text-base outline-none hover:overflow-y-auto sm:text-lg"
-              onInput={(event) => normalizeText(event.currentTarget)}
-              onPaste={(event) => {
-                event.preventDefault();
-                const text = event.clipboardData.getData("text/plain");
-                insertTextAtCursor(text);
-                normalizeText(event.currentTarget);
-              }}
-            />
-          </div>
-        </div>
-
-        <div className="mt-auto flex flex-col gap-3 px-4 sm:h-10 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => imageInputRef.current?.click()}
-              className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-transparent bg-white/60 px-4 py-1 text-sm font-medium text-stone-700 shadow-sm transition hover:border-stone-400/80 dark:bg-stone-950/40 dark:text-stone-200 sm:px-5 sm:py-1.25 sm:text-md"
-            >
-              Image
-            </button>
-          </div>
-
-          <div className="self-end sm:self-auto">
-            <CustomTooltip content={!canSend ? "Add text or an image first" : "Ask"}>
-              <span className="inline-flex">
-                <button
-                  type="button"
-                  disabled={!canSend || isSending}
-                  onClick={sendToAi}
-                  className="inline-flex h-8 w-8 cursor-pointer items-center justify-center text-stone-900 duration-250 hover:-rotate-27 hover:text-stone-700 dark:text-stone-100 dark:hover:text-stone-400 disabled:pointer-events-none disabled:cursor-default disabled:opacity-60 disabled:hover:rotate-0 disabled:hover:text-stone-900 dark:disabled:hover:text-stone-100"
-                >
-                  <Send className="h-6.5 w-6.5" />
-                </button>
+      <div className="w-full bg-stone-300 px-3 pb-1 pt-0.5 dark:bg-stone-900">
+        <div className="mx-auto flex w-full max-w-3xl flex-col">
+          <div className="flex h-auto min-h-28 max-h-70 w-full flex-col gap-2 overflow-visible rounded-4xl bg-[#bdb9b7] pb-2 pt-3.5 dark:bg-[#272320] sm:min-h-30">
+          <div className="relative px-4 sm:px-5">
+            {prompt.length === 0 && (
+              <span className="pointer-events-none absolute left-4.5 top-4 -translate-y-1/2 text-base text-stone-800 dark:text-stone-400 sm:left-5.25 sm:text-lg">
+                Ask CiviqAI....
               </span>
-            </CustomTooltip>
+            )}
+
+            <div className="grid">
+              <p
+                aria-hidden="true"
+                className="pointer-events-none col-start-1 row-start-1 m-0 min-h-10 max-h-50 w-full select-none overflow-hidden whitespace-pre-wrap break-words p-0 text-base text-transparent sm:text-lg"
+              >
+                {prompt || ""}
+              </p>
+              <p
+                ref={inputRef}
+                contentEditable
+                suppressContentEditableWarning
+                role="textbox"
+                aria-label="Ask CiviqAI"
+                className="ask-input col-start-1 row-start-1 m-0 min-h-10 max-h-45 w-full overflow-hidden whitespace-pre-wrap break-words bg-transparent p-0 text-base outline-none hover:overflow-y-auto sm:text-lg"
+                onInput={(event) => normalizeText(event.currentTarget)}
+                onPaste={(event) => {
+                  event.preventDefault();
+                  const text = event.clipboardData.getData("text/plain");
+                  insertTextAtCursor(text);
+                  normalizeText(event.currentTarget);
+                }}
+              />
+            </div>
           </div>
+
+          <div className="mt-auto flex flex-col gap-3 px-4 sm:h-10 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => imageInputRef.current?.click()}
+                className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-transparent bg-white/60 px-4 py-1 text-sm font-medium text-stone-700 shadow-sm transition hover:border-stone-400/80 dark:bg-stone-950/40 dark:text-stone-200 sm:px-5 sm:py-1.25 sm:text-md"
+              >
+                Image
+              </button>
+              <button
+                type="button"
+                onClick={() => documentInputRef.current?.click()}
+                className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-transparent bg-white/60 px-4 py-1 text-sm font-medium text-stone-700 shadow-sm transition hover:border-stone-400/80 dark:bg-stone-950/40 dark:text-stone-200 sm:px-5 sm:py-1.25 sm:text-md"
+              >
+                Document
+              </button>
+            </div>
+
+            <div className="self-end sm:self-auto">
+              <CustomTooltip content={!canSend ? "Add text or an image first" : "Ask"}>
+                <span className="inline-flex">
+                  <button
+                    type="button"
+                    disabled={!canSend || isSending}
+                    onClick={sendToAi}
+                    className="inline-flex h-8 w-8 cursor-pointer items-center justify-center text-stone-900 duration-250 hover:-rotate-27 hover:text-stone-700 dark:text-stone-100 dark:hover:text-stone-400 disabled:pointer-events-none disabled:cursor-default disabled:opacity-60 disabled:hover:rotate-0 disabled:hover:text-stone-900 dark:disabled:hover:text-stone-100"
+                  >
+                    <Send className="h-6.5 w-6.5" />
+                  </button>
+                </span>
+              </CustomTooltip>
+            </div>
+          </div>
+          </div>
+
+          <p className="mt-1 text-center text-sm text-stone-600 dark:text-stone-400">
+            All rights reserved | Made by{" "}
+            <a
+              href="https://itsaditya.vercel.app"
+              target="_blank"
+              rel="noreferrer"
+              className="font-medium text-stone-800 underline underline-offset-4 transition hover:text-stone-600 dark:text-stone-200 dark:hover:text-stone-300"
+            >
+              Aditya Singh
+            </a>
+          </p>
         </div>
       </div>
 
@@ -365,6 +412,14 @@ export default function SearchBar({ onSend, isSending = false }) {
         multiple
         className="hidden"
         onChange={onPickImages}
+      />
+      <input
+        ref={documentInputRef}
+        type="file"
+        accept="application/pdf,text/plain,.pdf,.txt"
+        multiple
+        className="hidden"
+        onChange={onPickDocuments}
       />
     </div>
   );

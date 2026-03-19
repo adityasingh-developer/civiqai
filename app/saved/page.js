@@ -1,13 +1,17 @@
 "use client";
 
-import { Copy } from "lucide-react";
+import { Copy, X } from "lucide-react";
 import { signIn, useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 
 import LoadingDots from "@/components/LoadingDots";
 import MessageAttachments from "@/components/MessageAttachments";
-import { buildSavedMessagesFromChats } from "@/lib/chatSaved";
+import {
+  buildSavedMessagesFromChats,
+  removeSavedMessageFromChats,
+} from "@/lib/chatSaved";
 import { readUserCache, writeUserCache } from "@/lib/localCache";
+import CustomTooltip from "@/components/customTooltip";
 
 const formatSavedTime = (timestamp) =>
   new Date(timestamp).toLocaleString([], {
@@ -25,6 +29,7 @@ export default function SavedPage() {
   const [savedMessages, setSavedMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [copiedId, setCopiedId] = useState(null);
+  const [removingIds, setRemovingIds] = useState(new Set());
 
   useEffect(() => {
     if (status !== "authenticated") {
@@ -86,6 +91,41 @@ export default function SavedPage() {
     }
   };
 
+  const handleRemoveSaved = async (message) => {
+    const previousHistory = readUserCache("chat-cache", userEmail);
+    const nextHistory = removeSavedMessageFromChats(previousHistory, message);
+
+    setRemovingIds((prev) => new Set(prev).add(message.id));
+    writeUserCache("chat-cache", userEmail, nextHistory);
+    setSavedMessages(buildSavedMessagesFromChats(nextHistory));
+
+    try {
+      const res = await fetch("/api/user/saved", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chatId: message.chatId,
+          role: message.role,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data?.error || "Failed to remove saved message");
+      }
+    } catch (error) {
+      writeUserCache("chat-cache", userEmail, previousHistory);
+      setSavedMessages(buildSavedMessagesFromChats(previousHistory));
+      console.error("Failed to remove saved message", error);
+    } finally {
+      setRemovingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(message.id);
+        return next;
+      });
+    }
+  };
+
   return (
     <main className="min-h-screen bg-stone-300 text-stone-900 transition-colors duration-300 dark:bg-stone-900 dark:text-stone-200">
       <section className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 pb-14 pt-24 sm:px-6 sm:pt-28">
@@ -132,14 +172,30 @@ export default function SavedPage() {
                       Saved {formatSavedTime(message.createdAt)}
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleCopy(message)}
-                    className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-stone-200/80 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-300 dark:bg-stone-700 dark:text-stone-100 dark:hover:bg-stone-600"
-                  >
-                    <Copy className="h-4 w-4" />
-                    {copiedId === message.id ? "Copied" : "Copy"}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <CustomTooltip content="Remove">
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveSaved(message)}
+                        disabled={removingIds.has(message.id)}
+                        className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-stone-200/80 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-300 disabled:cursor-default disabled:opacity-60 dark:bg-stone-700 dark:text-stone-100 dark:hover:bg-stone-600"
+                      >
+                        <X className="h-4 w-4" />
+
+                      </button>
+                    </CustomTooltip>
+
+                    <CustomTooltip content="Copy">
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(message)}
+                        className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-stone-200/80 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-300 dark:bg-stone-700 dark:text-stone-100 dark:hover:bg-stone-600"
+                      >
+                        <Copy className="h-4 w-4" />
+                        {copiedId === message.id ? "Copied" : ""}
+                      </button>
+                    </CustomTooltip>
+                  </div>
                 </div>
                 <div className="mt-4">
                   <MessageAttachments images={message.images} />

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { Bookmark, BookmarkCheck, Copy } from "lucide-react";
 import { signIn, useSession } from "next-auth/react";
@@ -171,7 +171,7 @@ export default function ChatPage() {
     const userTime = formatChatTime(userTimestamp);
     const safeText = text.slice(0, 4000);
     const displayText =
-      safeText || `Sent ${images.length} image${images.length === 1 ? "" : "s"}.`;
+      safeText || `Sent ${images.length} attachment${images.length === 1 ? "" : "s"}.`;
     const tempChatId = `temp-${Date.now()}`;
     const tempUserId = `u-${tempChatId}`;
     const tempAssistantId = `a-${tempChatId}`;
@@ -188,6 +188,7 @@ export default function ChatPage() {
           cacheKey: image.cacheKey,
           name: image.name,
           mimeType: image.mimeType,
+          previewUrl: image.previewUrl || null,
         })),
         time: userTime,
         saved: false,
@@ -290,25 +291,29 @@ export default function ChatPage() {
               messages.map((message) => (
                 <div
                   key={message.id}
-                  className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+                  className={`flex flex-col ${message.role === "user" ? "items-end" : "items-start"}`}
                 >
+                    <MessageAttachments images={message.images} />
                   <div
-                    className={`group relative max-w-[92%] rounded-2xl px-4 py-3 text-md leading-relaxed shadow-sm sm:max-w-[70%] ${
+                    className={`group relative max-w-[92%] rounded-2xl text-md leading-relaxed shadow-sm sm:max-w-[70%] w-fit ${
+                      message.images?.length
+                        ? "px-2 pb-2 pt-2 sm:px-2.5 sm:pb-2.5 sm:pt-2.5"
+                        : "px-4 py-3"
+                    } ${
                       message.role === "user"
                         ? "bg-stone-900 text-stone-50 dark:bg-stone-100 dark:text-stone-900"
                         : "bg-stone-100 text-stone-800 dark:bg-stone-800 dark:text-stone-100"
                     }`}
                   >
-                    <MessageAttachments images={message.images} />
                     {message.loading ? (
                       <LoadingDots className="text-stone-800 dark:text-stone-100" />
                     ) : message.role === "assistant" ? (
                       <MarkdownMessage text={message.text} />
                     ) : message.text ? (
-                      <p>{message.text}</p>
+                      <p className={message.images?.length ? "px-1" : ""}>{message.text}</p>
                     ) : null
                     }
-                    <div className="mt-2 flex items-center gap-2 text-[11px] opacity-70">
+                    <div className={`flex items-center gap-2 text-[11px] opacity-70 ${message.images?.length ? "mt-1 px-1" : "mt-2"}`}>
                       <span>{message.time}</span>
                       {message.saved ? <span>Saved</span> : null}
                     </div>
@@ -363,7 +368,7 @@ export default function ChatPage() {
       </section>
 
       {isSignedIn && (
-        <div className="fixed bottom-4 left-1/2 w-full -translate-x-1/2 px-4 sm:bottom-6 sm:px-6">
+        <div className="fixed bottom-0 left-1/2 w-full -translate-x-1/2">
           <SearchBar onSend={handleSend} isSending={isSending} />
         </div>
       )}

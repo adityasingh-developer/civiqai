@@ -1,7 +1,5 @@
 import { Hanken_Grotesk } from "next/font/google";
 import { ThemeProvider } from "next-themes";
-
-import Footer from "@/components/Footer";
 import Navbar from "@/components/Navbar";
 import SessionWrapper from "@/components/SessionWrapper";
 
@@ -30,7 +28,6 @@ export default function RootLayout({ children }) {
             <main className="flex min-h-screen flex-col bg-stone-300 text-stone-900 duration-300 dark:bg-stone-900 dark:text-stone-200">
               <Navbar />
               <div className="flex-1">{children}</div>
-              <Footer />
             </main>
           </ThemeProvider>
         </body>
