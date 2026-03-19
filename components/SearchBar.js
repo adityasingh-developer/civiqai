@@ -6,42 +6,16 @@ import { X } from "lucide-react";
 
 import Send from "@/assets/send.svg";
 import CustomTooltip from "@/components/customTooltip";
+import {
+  cacheImageFile,
+  clearPendingImageRefs,
+  getCachedImageBlob,
+  getCachedImageData,
+  readPendingImageRefs,
+  writePendingImageRefs,
+} from "@/lib/browserImageCache";
 
 const PROMPT_SESSION_KEY = "civiqai_prompt";
-const IMAGES_SESSION_KEY = "civiqai_images";
-
-function readStoredImages() {
-  if (typeof window === "undefined") {
-    return [];
-  }
-
-  try {
-    const raw = sessionStorage.getItem(IMAGES_SESSION_KEY);
-    if (!raw) {
-      return [];
-    }
-
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed
-      .filter((image) => image?.data && image?.mimeType)
-      .map((image, index) => ({
-        id: image.id || `stored-${index}`,
-        file: null,
-        name: image.name || `image-${index + 1}`,
-        type: image.mimeType,
-        data: image.data,
-        url: `data:${image.mimeType};base64,${image.data}`,
-        isObjectUrl: false,
-      }));
-  } catch (error) {
-    console.error("Failed to read stored images", error);
-    return [];
-  }
-}
 
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
@@ -58,6 +32,41 @@ function fileToBase64(file) {
   });
 }
 
+function revokeImageUrls(images) {
+  images.forEach((image) => {
+    if (image.isObjectUrl && image.url) {
+      URL.revokeObjectURL(image.url);
+    }
+  });
+}
+
+async function buildPendingImages() {
+  const pendingImages = readPendingImageRefs();
+
+  if (!pendingImages.length) {
+    return [];
+  }
+
+  const images = await Promise.all(
+    pendingImages.map(async (image, index) => {
+      const blob = await getCachedImageBlob(image.cacheKey);
+      const imageUrl = blob ? URL.createObjectURL(blob) : null;
+
+      return {
+        id: image.cacheKey || `pending-${index}`,
+        file: null,
+        cacheKey: image.cacheKey,
+        name: image.name || `image-${index + 1}`,
+        type: image.mimeType,
+        url: imageUrl,
+        isObjectUrl: Boolean(imageUrl),
+      };
+    })
+  );
+
+  return images;
+}
+
 export default function SearchBar({ onSend, isSending = false }) {
   const router = useRouter();
   const [prompt, setPrompt] = useState(() =>
@@ -65,9 +74,7 @@ export default function SearchBar({ onSend, isSending = false }) {
       ? sessionStorage.getItem(PROMPT_SESSION_KEY) || ""
       : ""
   );
-  const [docs, setDocs] = useState([]);
-  const [images, setImages] = useState(() => readStoredImages());
-  const docInputRef = useRef(null);
+  const [images, setImages] = useState([]);
   const imageInputRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -75,7 +82,7 @@ export default function SearchBar({ onSend, isSending = false }) {
     `${file.name}__${file.type}__${file.size}__${file.lastModified}`;
 
   const imageKey = (image, index) =>
-    image.file ? fileKey(image.file) : image.id || `${image.name}-${index}`;
+    image.file ? fileKey(image.file) : image.cacheKey || image.id || `${image.name}-${index}`;
 
   const normalizeText = (element) => {
     const raw = element.textContent ?? "";
@@ -109,16 +116,6 @@ export default function SearchBar({ onSend, isSending = false }) {
     selection.addRange(range);
   };
 
-  const onPickDocs = (event) => {
-    const files = Array.from(event.target.files || []);
-    const pdfs = files.filter((file) => file.type === "application/pdf");
-    const existing = new Set(docs.map(fileKey));
-    const unique = pdfs.filter((file) => !existing.has(fileKey(file)));
-
-    setDocs((prev) => [...prev, ...unique]);
-    event.target.value = "";
-  };
-
   const onPickImages = (event) => {
     const files = Array.from(event.target.files || []);
     const validImages = files.filter((file) =>
@@ -132,9 +129,9 @@ export default function SearchBar({ onSend, isSending = false }) {
       .map((file) => ({
         id: fileKey(file),
         file,
+        cacheKey: null,
         name: file.name,
         type: file.type,
-        data: null,
         url: URL.createObjectURL(file),
         isObjectUrl: true,
       }));
@@ -143,15 +140,11 @@ export default function SearchBar({ onSend, isSending = false }) {
     event.target.value = "";
   };
 
-  const removeDoc = (index) => {
-    setDocs((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
-  };
-
   const removeImage = (index) => {
     setImages((prev) => {
       const image = prev[index];
 
-      if (image?.isObjectUrl) {
+      if (image?.isObjectUrl && image.url) {
         URL.revokeObjectURL(image.url);
       }
 
@@ -168,37 +161,42 @@ export default function SearchBar({ onSend, isSending = false }) {
   };
 
   const clearAttachments = () => {
-    images.forEach((image) => {
-      if (image.isObjectUrl) {
-        URL.revokeObjectURL(image.url);
-      }
-    });
-
-    setDocs([]);
+    revokeImageUrls(images);
+    clearPendingImageRefs();
     setImages([]);
   };
 
   const buildImagePayload = async () => {
     const payload = await Promise.all(
       images.map(async (image, index) => {
-        if (image.data) {
+        if (image.file) {
+          const cachedImage = await cacheImageFile(
+            image.file,
+            image.cacheKey || image.id || fileKey(image.file)
+          );
+
           return {
-            id: image.id || `stored-${index}`,
-            name: image.name || `image-${index + 1}`,
-            mimeType: image.type,
-            data: image.data,
+            cacheKey: cachedImage.cacheKey,
+            name: cachedImage.name,
+            mimeType: cachedImage.mimeType,
+            data: await fileToBase64(image.file),
           };
         }
 
-        if (!image.file) {
+        if (!image.cacheKey) {
+          return null;
+        }
+
+        const data = await getCachedImageData(image.cacheKey);
+        if (!data) {
           return null;
         }
 
         return {
-          id: image.id || fileKey(image.file),
-          name: image.file.name,
-          mimeType: image.file.type,
-          data: await fileToBase64(image.file),
+          cacheKey: image.cacheKey,
+          name: image.name || `image-${index + 1}`,
+          mimeType: image.type,
+          data,
         };
       })
     );
@@ -222,7 +220,13 @@ export default function SearchBar({ onSend, isSending = false }) {
     }
 
     sessionStorage.setItem(PROMPT_SESSION_KEY, text);
-    sessionStorage.setItem(IMAGES_SESSION_KEY, JSON.stringify(imagePayload));
+    writePendingImageRefs(
+      imagePayload.map((image) => ({
+        cacheKey: image.cacheKey,
+        name: image.name,
+        mimeType: image.mimeType,
+      }))
+    );
     router.push("/chat");
   };
 
@@ -230,18 +234,34 @@ export default function SearchBar({ onSend, isSending = false }) {
     if (prompt && inputRef.current && inputRef.current.textContent !== prompt) {
       inputRef.current.textContent = prompt;
     }
-
-    sessionStorage.removeItem(PROMPT_SESSION_KEY);
-    sessionStorage.removeItem(IMAGES_SESSION_KEY);
   }, [prompt]);
 
   useEffect(() => {
+    let isMounted = true;
+
+    const loadPendingImages = async () => {
+      const pendingImages = await buildPendingImages();
+      sessionStorage.removeItem(PROMPT_SESSION_KEY);
+      clearPendingImageRefs();
+
+      if (isMounted && pendingImages.length) {
+        setImages((currentImages) => {
+          revokeImageUrls(currentImages);
+          return pendingImages;
+        });
+      }
+    };
+
+    loadPendingImages();
+
     return () => {
-      images.forEach((image) => {
-        if (image.isObjectUrl) {
-          URL.revokeObjectURL(image.url);
-        }
-      });
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      revokeImageUrls(images);
     };
   }, [images]);
 
@@ -249,38 +269,22 @@ export default function SearchBar({ onSend, isSending = false }) {
 
   return (
     <div className="relative mx-auto flex w-full max-w-3xl flex-col gap-3 px-1 sm:px-0">
-      {(docs.length > 0 || images.length > 0) && (
+      {images.length > 0 && (
         <div className="flex flex-wrap gap-2 sm:gap-3">
-          {docs.map((file, index) => (
-            <span
-              key={`doc-${fileKey(file)}`}
-              className="group relative flex h-18 w-18 flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl bg-[#ccc8c5] p-2 text-stone-700 dark:bg-[#272320] dark:text-stone-200 sm:h-22 sm:w-22"
-            >
-              <span className="h-1 w-[95%] animate-pulse rounded-xs bg-stone-600 [animation-duration:1s]" />
-              <span className="h-1 w-[95%] animate-pulse rounded-xs bg-stone-600 [animation-duration:1s]" />
-              <span className="h-1 w-[95%] animate-pulse rounded-xs bg-stone-600 [animation-duration:1s]" />
-              <span className="h-1 w-[95%] animate-pulse rounded-xs bg-stone-600 [animation-duration:1s]" />
-              <span className="h-1 w-[95%] animate-pulse rounded-xs bg-stone-600 [animation-duration:1s]" />
-              <button
-                type="button"
-                onClick={() => removeDoc(index)}
-                className="absolute right-1 top-1 cursor-pointer rounded-full bg-stone-900 p-px opacity-0 duration-200 group-hover:opacity-100"
-              >
-                <X size={16} strokeWidth={3} />
-              </button>
-            </span>
-          ))}
-
           {images.map((image, index) => (
             <span
               key={`img-${imageKey(image, index)}`}
               className="group relative flex h-18 w-18 items-center justify-center gap-2 rounded-2xl bg-[#ccc8c5] text-xs text-stone-700 dark:bg-[#272320] dark:text-stone-200 sm:h-22 sm:w-22"
             >
-              <img
-                src={image.url}
-                alt={image.name}
-                className="h-12 w-12 rounded-md object-cover sm:h-15 sm:w-15"
-              />
+              {image.url ? (
+                <img
+                  src={image.url}
+                  alt={image.name}
+                  className="h-12 w-12 rounded-md object-cover sm:h-15 sm:w-15"
+                />
+              ) : (
+                <span className="max-w-14 truncate text-center">{image.name}</span>
+              )}
               <button
                 type="button"
                 onClick={() => removeImage(index)}
@@ -330,13 +334,6 @@ export default function SearchBar({ onSend, isSending = false }) {
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={() => docInputRef.current?.click()}
-              className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-transparent bg-white/60 px-4 py-1 text-sm font-medium text-stone-700 shadow-sm transition hover:border-stone-400/80 dark:bg-stone-950/40 dark:text-stone-200 sm:px-5 sm:py-1.25 sm:text-md"
-            >
-              Document
-            </button>
-            <button
-              type="button"
               onClick={() => imageInputRef.current?.click()}
               className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-transparent bg-white/60 px-4 py-1 text-sm font-medium text-stone-700 shadow-sm transition hover:border-stone-400/80 dark:bg-stone-950/40 dark:text-stone-200 sm:px-5 sm:py-1.25 sm:text-md"
             >
@@ -345,11 +342,7 @@ export default function SearchBar({ onSend, isSending = false }) {
           </div>
 
           <div className="self-end sm:self-auto">
-            <CustomTooltip
-              content={
-                !canSend ? "Add text or an image first" : "Ask"
-              }
-            >
+            <CustomTooltip content={!canSend ? "Add text or an image first" : "Ask"}>
               <span className="inline-flex">
                 <button
                   type="button"
@@ -365,14 +358,6 @@ export default function SearchBar({ onSend, isSending = false }) {
         </div>
       </div>
 
-      <input
-        ref={docInputRef}
-        type="file"
-        accept="application/pdf"
-        multiple
-        className="hidden"
-        onChange={onPickDocs}
-      />
       <input
         ref={imageInputRef}
         type="file"

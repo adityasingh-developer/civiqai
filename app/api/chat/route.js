@@ -1,5 +1,4 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-// import { Groq } from "groq-sdk";
 
 import { decryptJson, encryptJson } from "@/lib/crypto";
 import { getRequiredSession } from "@/lib/auth";
@@ -14,10 +13,6 @@ const SYSTEM_PROMPT =
   "Use # for headings. Do not add extra commentary.";
 
 const GOOGLE_MODEL = "gemini-2.5-flash";
-
-// const groq = new Groq({
-//   apiKey: process.env.GROQ_API_KEY,
-// });
 
 function buildGeminiHistory(history) {
   return history.flatMap((message) => {
@@ -84,12 +79,19 @@ export async function POST(req) {
         ? body.messages[body.messages.length - 1]?.content
         : undefined);
 
-    const finalMessage =
+    const userInput =
       typeof message === "string" && message.trim().length > 0
         ? message.trim()
-        : images.length > 0
-          ? "Analyze this image."
-          : "";
+        : "";
+    const finalMessage =
+      userInput || (images.length > 0 ? "Analyze this image." : "");
+    const promptImages = images
+      .filter((image) => image?.cacheKey && image?.name && image?.mimeType)
+      .map((image) => ({
+        cacheKey: image.cacheKey,
+        name: image.name,
+        mimeType: image.mimeType,
+      }));
 
     if (!finalMessage && images.length === 0) {
       return Response.json({ error: "Missing message" }, { status: 400 });
@@ -132,10 +134,15 @@ export async function POST(req) {
     const assistantTime = new Date();
 
     user.chatHistory.push({
-      promptEnc: encryptJson(finalMessage),
+      promptEnc: encryptJson(userInput),
       answerEnc: encryptJson(answer),
+      promptImages,
       userTime,
       assistantTime,
+      savedUser: false,
+      savedAssistant: false,
+      savedUserAt: null,
+      savedAssistantAt: null,
     });
     await user.save();
 
@@ -145,10 +152,15 @@ export async function POST(req) {
       answer,
       chat: {
         id: String(savedChat._id),
-        input: finalMessage,
+        input: userInput,
+        promptImages,
         answer,
         userTime,
         assistantTime,
+        savedUser: false,
+        savedAssistant: false,
+        savedUserAt: null,
+        savedAssistantAt: null,
       },
     });
   } catch (error) {

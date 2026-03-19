@@ -35,9 +35,6 @@ export const authOptions = {
 
       return true;
     },
-    async session({ session }) {
-      return session;
-    },
   },
 };
 

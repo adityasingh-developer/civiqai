@@ -29,7 +29,7 @@ export default function RootLayout({ children }) {
           <ThemeProvider attribute="class" enableSystem defaultTheme="dark">
             <main className="flex min-h-screen flex-col bg-stone-300 text-stone-900 duration-300 dark:bg-stone-900 dark:text-stone-200">
               <Navbar />
-              <div className="flex-1 pb-16">{children}</div>
+              <div className="flex-1">{children}</div>
               <Footer />
             </main>
           </ThemeProvider>

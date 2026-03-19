@@ -1,52 +1,20 @@
-﻿"use client";
+"use client";
 
-import Navbar from "@/components/Navbar";
-import SearchBar from "@/components/SearchBar";
-import LoadingDots from "@/components/LoadingDots";
-import MarkdownMessage from "@/components/MarkdownMessage";
-import { readUserCache, writeUserCache } from "@/lib/localCache";
+import { Bookmark, BookmarkCheck, Copy } from "lucide-react";
 import { signIn, useSession } from "next-auth/react";
 import { useEffect, useRef, useState } from "react";
-import { Bookmark, BookmarkCheck, Copy } from "lucide-react";
 
-const formatTime = (timestamp) =>
-  new Date(timestamp).toLocaleTimeString([], {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-
-const savedKey = (chatId, role) => `${chatId}:${role}`;
-
-const buildMessages = (history, savedLookup) => {
-  const list = [];
-
-  history.forEach((item, index) => {
-    const userTimestamp = item.userTime ?? item.time ?? Date.now();
-    const assistantTimestamp =
-      item.assistantTime ?? item.time ?? userTimestamp;
-    const chatId = item.id || `chat-${index}`;
-
-    list.push({
-      id: `u-${chatId}`,
-      chatId,
-      role: "user",
-      text: item.input,
-      time: formatTime(userTimestamp),
-      saved: savedLookup.has(savedKey(chatId, "user")),
-    });
-
-    list.push({
-      id: `a-${chatId}`,
-      chatId,
-      role: "assistant",
-      text: item.answer,
-      time: formatTime(assistantTimestamp),
-      saved: savedLookup.has(savedKey(chatId, "assistant")),
-    });
-  });
-
-  return list;
-};
+import LoadingDots from "@/components/LoadingDots";
+import MessageAttachments from "@/components/MessageAttachments";
+import MarkdownMessage from "@/components/MarkdownMessage";
+import SearchBar from "@/components/SearchBar";
+import {
+  buildChatMessages,
+  formatChatTime,
+  toggleSavedState,
+  writeChatCaches,
+} from "@/lib/chatPage";
+import { readUserCache } from "@/lib/localCache";
 
 export default function ChatPage() {
   const { data: session, status } = useSession();
@@ -54,8 +22,6 @@ export default function ChatPage() {
   const userEmail = session?.user?.email || "";
   const [history, setHistory] = useState([]);
   const [messages, setMessages] = useState([]);
-  const [savedLookup, setSavedLookup] = useState(new Set());
-  const [savedMessages, setSavedMessages] = useState([]);
   const [isSending, setIsSending] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [copiedId, setCopiedId] = useState(null);
@@ -66,24 +32,16 @@ export default function ChatPage() {
     if (status !== "authenticated") {
       setHistory([]);
       setMessages([]);
-      setSavedLookup(new Set());
-      setSavedMessages([]);
       setIsLoadingHistory(false);
       return;
     }
 
     let isMounted = true;
     const cachedHistory = readUserCache("chat-cache", userEmail);
-    const cachedSavedMessages = readUserCache("saved-cache", userEmail);
 
-    if (cachedHistory.length || cachedSavedMessages.length) {
-      const cachedSavedLookup = new Set(
-        cachedSavedMessages.map((item) => savedKey(item.chatId, item.role))
-      );
+    if (cachedHistory.length) {
       setHistory(cachedHistory);
-      setSavedMessages(cachedSavedMessages);
-      setSavedLookup(cachedSavedLookup);
-      setMessages(buildMessages(cachedHistory, cachedSavedLookup));
+      setMessages(buildChatMessages(cachedHistory));
       setIsLoadingHistory(false);
     } else {
       setIsLoadingHistory(true);
@@ -98,22 +56,15 @@ export default function ChatPage() {
           throw new Error(data?.error || "Failed to load chats");
         }
 
-        if (!isMounted) return;
+        if (!isMounted) {
+          return;
+        }
 
         const nextHistory = Array.isArray(data?.chats) ? data.chats : [];
-        const nextSavedMessages = Array.isArray(data?.savedMessages)
-          ? data.savedMessages
-          : [];
-        const nextSaved = new Set(
-          nextSavedMessages.map((item) => savedKey(item.chatId, item.role))
-        );
 
-        writeUserCache("chat-cache", userEmail, nextHistory);
-        writeUserCache("saved-cache", userEmail, nextSavedMessages);
+        writeChatCaches(userEmail, nextHistory);
         setHistory(nextHistory);
-        setSavedMessages(nextSavedMessages);
-        setSavedLookup(nextSaved);
-        setMessages(buildMessages(nextHistory, nextSaved));
+        setMessages(buildChatMessages(nextHistory));
       } catch (error) {
         console.error("Failed to load user data", error);
       } finally {
@@ -131,39 +82,54 @@ export default function ChatPage() {
   }, [status, userEmail]);
 
   useEffect(() => {
-    if (status !== "authenticated") return;
+    if (status !== "authenticated") {
+      return;
+    }
+
     const timer = setTimeout(() => {
       endRef.current?.scrollIntoView({ behavior: "auto", block: "end" });
     }, 0);
+
     return () => clearTimeout(timer);
   }, [status, messages.length]);
 
-  const handleCopy = async (msg) => {
+  const handleCopy = async (message) => {
     try {
-      await navigator.clipboard.writeText(msg.text || "");
-      setCopiedId(msg.id);
+      await navigator.clipboard.writeText(message.text || "");
+      setCopiedId(message.id);
       setTimeout(() => setCopiedId(null), 1200);
-    } catch (err) {
-      console.error("Copy failed", err);
+    } catch (error) {
+      console.error("Copy failed", error);
     }
   };
 
-  const handleToggleSaved = async (msg) => {
-    if (!msg.chatId || msg.loading) return;
+  const handleToggleSaved = async (message) => {
+    if (!message.chatId || message.loading) {
+      return;
+    }
 
-    const key = savedKey(msg.chatId, msg.role);
-    const isSaved = savedLookup.has(key);
+    const isSaved = Boolean(message.saved);
+    const optimisticCreatedAt = new Date().toISOString();
+    const previousHistory = history;
+    const optimisticHistory = toggleSavedState(
+      history,
+      message,
+      isSaved,
+      optimisticCreatedAt
+    );
 
-    setSavingIds((prev) => new Set(prev).add(msg.id));
+    setSavingIds((prev) => new Set(prev).add(message.id));
+    setHistory(optimisticHistory);
+    setMessages(buildChatMessages(optimisticHistory));
+    writeChatCaches(userEmail, optimisticHistory);
 
     try {
       const res = await fetch("/api/user/saved", {
         method: isSaved ? "DELETE" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          chatId: msg.chatId,
-          role: msg.role,
-          text: msg.text,
+          chatId: message.chatId,
+          role: message.role,
         }),
       });
 
@@ -172,50 +138,26 @@ export default function ChatPage() {
         throw new Error(data?.error || "Failed to update saved message");
       }
 
-      const nextSavedMessages = isSaved
-        ? savedMessages.filter(
-            (item) =>
-              !(
-                String(item.chatId) === String(msg.chatId) &&
-                item.role === msg.role
-              )
-          )
-        : [
-            ...savedMessages,
-            {
-              id: data?.savedMessage?.id || `${msg.chatId}:${msg.role}`,
-              chatId: msg.chatId,
-              role: msg.role,
-              text: msg.text,
-              createdAt:
-                data?.savedMessage?.createdAt || new Date().toISOString(),
-            },
-          ];
-
-      setSavedMessages(nextSavedMessages);
-      writeUserCache("saved-cache", userEmail, nextSavedMessages);
-
-      setSavedLookup((prev) => {
-        const next = new Set(prev);
-        if (isSaved) {
-          next.delete(key);
-        } else {
-          next.add(key);
-        }
-        return next;
-      });
-
-      setMessages((prev) =>
-        prev.map((item) =>
-          item.id === msg.id ? { ...item, saved: !isSaved } : item
-        )
-      );
+      if (!isSaved && data?.savedMessage?.createdAt) {
+        const syncedHistory = toggleSavedState(
+          optimisticHistory,
+          message,
+          false,
+          data.savedMessage.createdAt
+        );
+        setHistory(syncedHistory);
+        setMessages(buildChatMessages(syncedHistory));
+        writeChatCaches(userEmail, syncedHistory);
+      }
     } catch (error) {
+      setHistory(previousHistory);
+      setMessages(buildChatMessages(previousHistory));
+      writeChatCaches(userEmail, previousHistory);
       console.error("Save toggle failed", error);
     } finally {
       setSavingIds((prev) => {
         const next = new Set(prev);
-        next.delete(msg.id);
+        next.delete(message.id);
         return next;
       });
     }
@@ -224,7 +166,7 @@ export default function ChatPage() {
   const handleSend = async ({ text = "", images = [] }) => {
     setIsSending(true);
     const userTimestamp = Date.now();
-    const userTime = formatTime(userTimestamp);
+    const userTime = formatChatTime(userTimestamp);
     const safeText = text.slice(0, 4000);
     const displayText =
       safeText || `Sent ${images.length} image${images.length === 1 ? "" : "s"}.`;
@@ -239,6 +181,11 @@ export default function ChatPage() {
         chatId: tempChatId,
         role: "user",
         text: displayText,
+        images: images.map((image) => ({
+          cacheKey: image.cacheKey,
+          name: image.name,
+          mimeType: image.mimeType,
+        })),
         time: userTime,
         saved: false,
       },
@@ -261,8 +208,8 @@ export default function ChatPage() {
           message: safeText,
           images,
           history: messages
-            .filter((msg) => !msg.loading)
-            .map((msg) => ({ role: msg.role, content: msg.text }))
+            .filter((message) => !message.loading)
+            .map((message) => ({ role: message.role, content: message.text }))
             .slice(-12),
         }),
       });
@@ -272,10 +219,10 @@ export default function ChatPage() {
       if (!res.ok) {
         const errorMessage = data?.error || "Sorry, something went wrong.";
         setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === tempAssistantId
-              ? { ...msg, text: errorMessage, loading: false }
-              : msg
+          prev.map((message) =>
+            message.id === tempAssistantId
+              ? { ...message, text: errorMessage, loading: false }
+              : message
           )
         );
         return;
@@ -285,31 +232,38 @@ export default function ChatPage() {
       const nextHistoryItem = {
         id: chat.id,
         input: chat.input,
+        promptImages: Array.isArray(chat.promptImages) ? chat.promptImages : [],
         answer: data.answer,
         userTime: chat.userTime,
         assistantTime: chat.assistantTime,
+        savedUser: Boolean(chat.savedUser),
+        savedAssistant: Boolean(chat.savedAssistant),
+        savedUserAt: chat.savedUserAt,
+        savedAssistantAt: chat.savedAssistantAt,
       };
 
       setHistory((prev) => {
         const nextHistory = [...prev, nextHistoryItem];
-        writeUserCache("chat-cache", userEmail, nextHistory);
+        writeChatCaches(userEmail, nextHistory);
         return nextHistory;
       });
+
       setMessages((prev) => {
         const withoutTemp = prev.filter(
-          (msg) => msg.id !== tempUserId && msg.id !== tempAssistantId
+          (message) =>
+            message.id !== tempUserId && message.id !== tempAssistantId
         );
-        return [...withoutTemp, ...buildMessages([nextHistoryItem], savedLookup)];
+        return [...withoutTemp, ...buildChatMessages([nextHistoryItem])];
       });
-    } catch (err) {
+    } catch (error) {
       setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === tempAssistantId
-            ? { ...msg, text: "Sorry, something went wrong.", loading: false }
-            : msg
+        prev.map((message) =>
+          message.id === tempAssistantId
+            ? { ...message, text: "Sorry, something went wrong.", loading: false }
+            : message
         )
       );
-      console.error(err);
+      console.error(error);
     } finally {
       setIsSending(false);
     }
@@ -317,8 +271,6 @@ export default function ChatPage() {
 
   return (
     <main className="min-h-screen bg-stone-300 text-stone-900 transition-colors duration-300 dark:bg-stone-900 dark:text-stone-200">
-      <Navbar />
-
       <section className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pb-44 pt-24 sm:px-6 sm:pt-28">
         <div className="flex flex-col gap-4">
           {isSignedIn ? (
@@ -332,39 +284,41 @@ export default function ChatPage() {
                 <p className="mt-1 text-lg">Start a conversation and save any message you want to keep.</p>
               </div>
             ) : (
-              messages.map((msg) => (
+              messages.map((message) => (
                 <div
-                  key={msg.id}
-                  className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                  key={message.id}
+                  className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
                 >
                   <div
                     className={`group relative max-w-[92%] rounded-2xl px-4 py-3 text-md leading-relaxed shadow-sm sm:max-w-[70%] ${
-                      msg.role === "user"
+                      message.role === "user"
                         ? "bg-stone-900 text-stone-50 dark:bg-stone-100 dark:text-stone-900"
                         : "bg-stone-100 text-stone-800 dark:bg-stone-800 dark:text-stone-100"
                     }`}
                   >
-                    {msg.loading ? (
+                    <MessageAttachments images={message.images} />
+                    {message.loading ? (
                       <LoadingDots className="text-stone-800 dark:text-stone-100" />
-                    ) : msg.role === "assistant" ? (
-                      <MarkdownMessage text={msg.text} />
-                    ) : (
-                      <p>{msg.text}</p>
-                    )}
+                    ) : message.role === "assistant" ? (
+                      <MarkdownMessage text={message.text} />
+                    ) : message.text ? (
+                      <p>{message.text}</p>
+                    ) : null
+                    }
                     <div className="mt-2 flex items-center gap-2 text-[11px] opacity-70">
-                      <span>{msg.time}</span>
-                      {msg.saved ? <span>Saved</span> : null}
+                      <span>{message.time}</span>
+                      {message.saved ? <span>Saved</span> : null}
                     </div>
-                    {!msg.loading && (
+                    {!message.loading && (
                       <div className="absolute right-3 top-3 flex items-center gap-2 opacity-0 transition group-hover:opacity-100">
                         <button
                           type="button"
-                          onClick={() => handleToggleSaved(msg)}
-                          className="inline-flex items-center justify-center rounded-full bg-stone-200/70 p-1.5 text-stone-700 transition dark:bg-stone-700/90 dark:text-stone-100 cursor-pointer"
-                          aria-label={msg.saved ? "Unsave message" : "Save message"}
-                          disabled={savingIds.has(msg.id)}
+                          onClick={() => handleToggleSaved(message)}
+                          className="inline-flex cursor-pointer items-center justify-center rounded-full bg-stone-200/70 p-1.5 text-stone-700 transition dark:bg-stone-700/90 dark:text-stone-100"
+                          aria-label={message.saved ? "Unsave message" : "Save message"}
+                          disabled={savingIds.has(message.id)}
                         >
-                          {msg.saved ? (
+                          {message.saved ? (
                             <BookmarkCheck className="h-3.5 w-3.5" />
                           ) : (
                             <Bookmark className="h-3.5 w-3.5" />
@@ -372,9 +326,9 @@ export default function ChatPage() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleCopy(msg)}
-                          className="inline-flex items-center justify-center rounded-full bg-stone-200/70 p-1.5 text-stone-700 transition dark:bg-stone-700/90 dark:text-stone-100 cursor-pointer"
-                          aria-label={copiedId === msg.id ? "Copied" : "Copy"}
+                          onClick={() => handleCopy(message)}
+                          className="inline-flex cursor-pointer items-center justify-center rounded-full bg-stone-200/70 p-1.5 text-stone-700 transition dark:bg-stone-700/90 dark:text-stone-100"
+                          aria-label={copiedId === message.id ? "Copied" : "Copy"}
                         >
                           <Copy className="h-3.5 w-3.5" />
                         </button>

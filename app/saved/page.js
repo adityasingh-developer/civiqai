@@ -1,11 +1,13 @@
 "use client";
 
-import Navbar from "@/components/Navbar";
-import LoadingDots from "@/components/LoadingDots";
-import { readUserCache, writeUserCache } from "@/lib/localCache";
-import { signIn, useSession } from "next-auth/react";
 import { Copy } from "lucide-react";
+import { signIn, useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
+
+import LoadingDots from "@/components/LoadingDots";
+import MessageAttachments from "@/components/MessageAttachments";
+import { buildSavedMessagesFromChats } from "@/lib/chatSaved";
+import { readUserCache, writeUserCache } from "@/lib/localCache";
 
 const formatSavedTime = (timestamp) =>
   new Date(timestamp).toLocaleString([], {
@@ -32,7 +34,8 @@ export default function SavedPage() {
     }
 
     let isMounted = true;
-    const cachedSavedMessages = readUserCache("saved-cache", userEmail);
+    const cachedHistory = readUserCache("chat-cache", userEmail);
+    const cachedSavedMessages = buildSavedMessagesFromChats(cachedHistory);
 
     if (cachedSavedMessages.length) {
       setSavedMessages(cachedSavedMessages);
@@ -52,15 +55,10 @@ export default function SavedPage() {
 
         if (!isMounted) return;
 
-        const nextSavedMessages = Array.isArray(data?.savedMessages)
-          ? data.savedMessages
-          : [];
+        const nextHistory = Array.isArray(data?.chats) ? data.chats : [];
+        const nextSavedMessages = buildSavedMessagesFromChats(nextHistory);
 
-        nextSavedMessages.sort(
-          (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-        );
-
-        writeUserCache("saved-cache", userEmail, nextSavedMessages);
+        writeUserCache("chat-cache", userEmail, nextHistory);
         setSavedMessages(nextSavedMessages);
       } catch (error) {
         console.error("Failed to load saved messages", error);
@@ -90,8 +88,6 @@ export default function SavedPage() {
 
   return (
     <main className="min-h-screen bg-stone-300 text-stone-900 transition-colors duration-300 dark:bg-stone-900 dark:text-stone-200">
-      <Navbar />
-
       <section className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 pb-14 pt-24 sm:px-6 sm:pt-28">
         {!isSignedIn ? (
           <div className="rounded-2xl border border-stone-200/70 bg-white/70 p-5 text-sm text-stone-700 shadow-sm backdrop-blur dark:border-stone-700/70 dark:bg-stone-900/60 dark:text-stone-200">
@@ -145,9 +141,14 @@ export default function SavedPage() {
                     {copiedId === message.id ? "Copied" : "Copy"}
                   </button>
                 </div>
-                <p className="mt-4 whitespace-pre-wrap break-words text-base leading-relaxed text-stone-800 dark:text-stone-100">
-                  {message.text}
-                </p>
+                <div className="mt-4">
+                  <MessageAttachments images={message.images} />
+                  {message.text ? (
+                    <p className="whitespace-pre-wrap break-words text-base leading-relaxed text-stone-800 dark:text-stone-100">
+                      {message.text}
+                    </p>
+                  ) : null}
+                </div>
               </article>
             ))}
           </div>

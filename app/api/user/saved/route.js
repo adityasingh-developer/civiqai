@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { connectDb } from "@/lib/mongoose";
-import { encryptJson } from "@/lib/crypto";
+import mongoose from "mongoose";
+
 import { getRequiredSession } from "@/lib/auth";
+import { connectDb } from "@/lib/mongoose";
 import User from "@/model/User";
 
 export async function POST(req) {
@@ -12,47 +13,52 @@ export async function POST(req) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { chatId, role, text } = await req.json();
+    const { chatId, role } = await req.json();
 
-    if (!chatId || !text || !["user", "assistant"].includes(role)) {
+    if (!chatId || !["user", "assistant"].includes(role)) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
     }
 
     await connectDb();
-    const user = await User.findOne({ email: session.user.email });
 
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    if (!mongoose.Types.ObjectId.isValid(chatId)) {
+      return NextResponse.json({ error: "Invalid chat id" }, { status: 400 });
     }
 
-    const exists = user.savedMessages.some(
-      (item) => String(item.chatId) === String(chatId) && item.role === role
+    const savedAt = new Date();
+    const chatObjectId = new mongoose.Types.ObjectId(chatId);
+    const update =
+      role === "user"
+        ? {
+            $set: {
+              "chatHistory.$.savedUser": true,
+              "chatHistory.$.savedUserAt": savedAt,
+            },
+          }
+        : {
+            $set: {
+              "chatHistory.$.savedAssistant": true,
+              "chatHistory.$.savedAssistantAt": savedAt,
+            },
+          };
+
+    const result = await User.collection.updateOne(
+      { email: session.user.email, "chatHistory._id": chatObjectId },
+      update
     );
 
-    if (!exists) {
-      user.savedMessages.push({
-        chatId,
-        role,
-        contentEnc: encryptJson(text),
-        createdAt: new Date(),
-      });
-      await user.save();
+    if (result.matchedCount === 0) {
+      return NextResponse.json({ error: "Chat not found" }, { status: 404 });
     }
-
-    const saved = user.savedMessages.find(
-      (item) => String(item.chatId) === String(chatId) && item.role === role
-    );
 
     return NextResponse.json({
       ok: true,
-      savedMessage: saved
-        ? {
-            id: String(saved._id),
-            chatId: String(saved.chatId),
-            role: saved.role,
-            createdAt: saved.createdAt,
-          }
-        : null,
+      savedMessage: {
+        id: `${chatId}:${role}`,
+        chatId,
+        role,
+        createdAt: savedAt,
+      },
     });
   } catch (error) {
     console.error("Failed to save message:", error);
@@ -75,16 +81,35 @@ export async function DELETE(req) {
     }
 
     await connectDb();
-    const user = await User.findOne({ email: session.user.email });
 
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    if (!mongoose.Types.ObjectId.isValid(chatId)) {
+      return NextResponse.json({ error: "Invalid chat id" }, { status: 400 });
     }
 
-    user.savedMessages = user.savedMessages.filter(
-      (item) => !(String(item.chatId) === String(chatId) && item.role === role)
+    const chatObjectId = new mongoose.Types.ObjectId(chatId);
+    const update =
+      role === "user"
+        ? {
+            $set: {
+              "chatHistory.$.savedUser": false,
+              "chatHistory.$.savedUserAt": null,
+            },
+          }
+        : {
+            $set: {
+              "chatHistory.$.savedAssistant": false,
+              "chatHistory.$.savedAssistantAt": null,
+            },
+          };
+
+    const result = await User.collection.updateOne(
+      { email: session.user.email, "chatHistory._id": chatObjectId },
+      update
     );
-    await user.save();
+
+    if (result.matchedCount === 0) {
+      return NextResponse.json({ error: "Chat not found" }, { status: 404 });
+    }
 
     return NextResponse.json({ ok: true });
   } catch (error) {

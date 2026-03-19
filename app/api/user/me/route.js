@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { connectDb } from "@/lib/mongoose";
-import { decryptJson } from "@/lib/crypto";
 import { getRequiredSession } from "@/lib/auth";
+import { decryptJson } from "@/lib/crypto";
+import { connectDb } from "@/lib/mongoose";
 import User from "@/model/User";
 
 export async function GET() {
@@ -23,16 +23,13 @@ export async function GET() {
       id: String(chat._id),
       input: decryptJson(chat.promptEnc),
       answer: decryptJson(chat.answerEnc),
+      promptImages: Array.isArray(chat.promptImages) ? chat.promptImages : [],
       userTime: chat.userTime,
       assistantTime: chat.assistantTime,
-    }));
-
-    const savedMessages = (user.savedMessages || []).map((item) => ({
-      id: String(item._id),
-      chatId: String(item.chatId),
-      role: item.role,
-      text: decryptJson(item.contentEnc),
-      createdAt: item.createdAt,
+      savedUser: Boolean(chat.savedUser),
+      savedAssistant: Boolean(chat.savedAssistant),
+      savedUserAt: chat.savedUserAt,
+      savedAssistantAt: chat.savedAssistantAt,
     }));
 
     return NextResponse.json({
@@ -45,7 +42,6 @@ export async function GET() {
         lastLogin: user.lastLogin,
       },
       chats,
-      savedMessages,
     });
   } catch (error) {
     console.error("Failed to load user data:", error);
