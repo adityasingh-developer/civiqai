@@ -356,8 +356,8 @@ export default function SearchBar({ onSend, isSending = false }) {
             </div>
           </div>
 
-          <div className="mt-auto flex flex-col gap-3 px-4 sm:h-10 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-            <div className="flex flex-wrap items-center gap-2">
+          <div className="mt-auto flex items-center justify-between gap-3 px-4 sm:h-10 sm:px-5">
+            <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => imageInputRef.current?.click()}
@@ -374,7 +374,7 @@ export default function SearchBar({ onSend, isSending = false }) {
               </button>
             </div>
 
-            <div className="self-end sm:self-auto">
+            <div className="shrink-0">
               <CustomTooltip content={!canSend ? "Add text or an image first" : "Ask"}>
                 <span className="inline-flex">
                   <button

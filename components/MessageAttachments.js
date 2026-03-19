@@ -51,13 +51,13 @@ function ImageAttachmentCard({ image }) {
   }
 
   return (
-    <div className="flex min-h-18 min-w-32 items-center gap-2 rounded-lg bg-stone-200/80 px-3 py-2 text-xs text-stone-700 dark:bg-stone-700/70 dark:text-stone-100">
+    <div className="flex w-fit max-w-[13rem] items-center gap-2 rounded-lg bg-stone-200/80 px-3 py-2 text-xs text-stone-700 dark:bg-stone-700/70 dark:text-stone-100">
       {isImage ? (
         <ImageIcon className="h-4 w-4 shrink-0" />
       ) : (
         <FileText className="h-4 w-4 shrink-0" />
       )}
-      <span className="max-w-36 truncate">{image.name}</span>
+      <span className="max-w-[10rem] truncate">{image.name}</span>
     </div>
   );
 }
@@ -68,7 +68,7 @@ export default function MessageAttachments({ images = [] }) {
   }
 
   return (
-    <div className="mb-1.5 flex flex-wrap gap-1.5">
+    <div className="mb-1.5 inline-flex w-fit max-w-full max-[500px]:justify-end flex-wrap gap-1.5">
       {images.map((image) => (
         <ImageAttachmentCard
           key={image.cacheKey || `${image.name}-${image.mimeType}`}
