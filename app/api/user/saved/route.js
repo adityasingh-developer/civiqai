@@ -14,6 +14,7 @@ export async function POST(req) {
     }
 
     const { chatId, role } = await req.json();
+    // console.log("save message request", { chatId, role, email: session?.user?.email });
 
     if (!chatId || !["user", "assistant"].includes(role)) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
@@ -75,6 +76,7 @@ export async function DELETE(req) {
     }
 
     const { chatId, role } = await req.json();
+    // console.log("unsave message request", { chatId, role });
 
     if (!chatId || !["user", "assistant"].includes(role)) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });

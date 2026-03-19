@@ -40,6 +40,7 @@ export default function ChatPage() {
     const cachedHistory = readUserCache("chat-cache", userEmail);
 
     if (cachedHistory.length) {
+      // console.log("using cached chats first", cachedHistory.length);
       setHistory(cachedHistory);
       setMessages(buildChatMessages(cachedHistory));
       setIsLoadingHistory(false);
@@ -109,6 +110,7 @@ export default function ChatPage() {
     }
 
     const isSaved = Boolean(message.saved);
+    // console.log("toggle save clicked", { chatId: message.chatId, role: message.role, isSaved });
     const optimisticCreatedAt = new Date().toISOString();
     const previousHistory = history;
     const optimisticHistory = toggleSavedState(
@@ -173,6 +175,7 @@ export default function ChatPage() {
     const tempChatId = `temp-${Date.now()}`;
     const tempUserId = `u-${tempChatId}`;
     const tempAssistantId = `a-${tempChatId}`;
+    // console.log("sending chat", { chars: safeText.length, images: images.length });
 
     setMessages((prev) => [
       ...prev,

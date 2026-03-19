@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+// import Groq from "groq-sdk";
 
 import { decryptJson, encryptJson } from "@/lib/crypto";
 import { getRequiredSession } from "@/lib/auth";
@@ -57,6 +58,7 @@ function buildGeminiParts(message, images) {
 export async function POST(req) {
   try {
     const session = await getRequiredSession();
+    // console.log("chat route hit", { email: session?.user?.email });
 
     if (!session) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -92,6 +94,7 @@ export async function POST(req) {
         name: image.name,
         mimeType: image.mimeType,
       }));
+    // console.log("incoming chat payload", { history: history.length, images: promptImages.length });
 
     if (!finalMessage && images.length === 0) {
       return Response.json({ error: "Missing message" }, { status: 400 });
@@ -116,6 +119,7 @@ export async function POST(req) {
       model: GOOGLE_MODEL,
       systemInstruction: SYSTEM_PROMPT,
     });
+    // const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
     const chatSession = model.startChat({
       history: buildGeminiHistory(dbHistory),
@@ -125,6 +129,7 @@ export async function POST(req) {
       },
     });
 
+    // console.log("chat payload", { user: session.user.email, images: images.length });
     const result = await chatSession.sendMessage(
       buildGeminiParts(finalMessage, images)
     );
