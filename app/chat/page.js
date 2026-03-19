@@ -221,11 +221,13 @@ export default function ChatPage() {
     }
   };
 
-  const handleSend = async (text) => {
+  const handleSend = async ({ text = "", images = [] }) => {
     setIsSending(true);
     const userTimestamp = Date.now();
     const userTime = formatTime(userTimestamp);
     const safeText = text.slice(0, 4000);
+    const displayText =
+      safeText || `Sent ${images.length} image${images.length === 1 ? "" : "s"}.`;
     const tempChatId = `temp-${Date.now()}`;
     const tempUserId = `u-${tempChatId}`;
     const tempAssistantId = `a-${tempChatId}`;
@@ -236,7 +238,7 @@ export default function ChatPage() {
         id: tempUserId,
         chatId: tempChatId,
         role: "user",
-        text: safeText,
+        text: displayText,
         time: userTime,
         saved: false,
       },
@@ -257,6 +259,7 @@ export default function ChatPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: safeText,
+          images,
           history: messages
             .filter((msg) => !msg.loading)
             .map((msg) => ({ role: msg.role, content: msg.text }))

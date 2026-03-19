@@ -7,21 +7,75 @@ import { X } from "lucide-react";
 import Send from "@/assets/send.svg";
 import CustomTooltip from "@/components/customTooltip";
 
+const PROMPT_SESSION_KEY = "civiqai_prompt";
+const IMAGES_SESSION_KEY = "civiqai_images";
+
+function readStoredImages() {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const raw = sessionStorage.getItem(IMAGES_SESSION_KEY);
+    if (!raw) {
+      return [];
+    }
+
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed
+      .filter((image) => image?.data && image?.mimeType)
+      .map((image, index) => ({
+        id: image.id || `stored-${index}`,
+        file: null,
+        name: image.name || `image-${index + 1}`,
+        type: image.mimeType,
+        data: image.data,
+        url: `data:${image.mimeType};base64,${image.data}`,
+        isObjectUrl: false,
+      }));
+  } catch (error) {
+    console.error("Failed to read stored images", error);
+    return [];
+  }
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : "";
+      const [, data = ""] = result.split(",");
+      resolve(data);
+    };
+
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function SearchBar({ onSend, isSending = false }) {
   const router = useRouter();
   const [prompt, setPrompt] = useState(() =>
     typeof window !== "undefined"
-      ? sessionStorage.getItem("civiqai_prompt") || ""
+      ? sessionStorage.getItem(PROMPT_SESSION_KEY) || ""
       : ""
   );
   const [docs, setDocs] = useState([]);
-  const [images, setImages] = useState([]);
+  const [images, setImages] = useState(() => readStoredImages());
   const docInputRef = useRef(null);
   const imageInputRef = useRef(null);
   const inputRef = useRef(null);
 
   const fileKey = (file) =>
     `${file.name}__${file.type}__${file.size}__${file.lastModified}`;
+
+  const imageKey = (image, index) =>
+    image.file ? fileKey(image.file) : image.id || `${image.name}-${index}`;
 
   const normalizeText = (element) => {
     const raw = element.textContent ?? "";
@@ -70,12 +124,20 @@ export default function SearchBar({ onSend, isSending = false }) {
     const validImages = files.filter((file) =>
       ["image/png", "image/jpeg"].includes(file.type)
     );
-    const existing = new Set(images.map((item) => fileKey(item.file)));
-    const unique = validImages.filter((file) => !existing.has(fileKey(file)));
-    const nextImages = unique.map((file) => ({
-      file,
-      url: URL.createObjectURL(file),
-    }));
+    const existing = new Set(
+      images.map((image, index) => imageKey(image, index))
+    );
+    const nextImages = validImages
+      .filter((file) => !existing.has(fileKey(file)))
+      .map((file) => ({
+        id: fileKey(file),
+        file,
+        name: file.name,
+        type: file.type,
+        data: null,
+        url: URL.createObjectURL(file),
+        isObjectUrl: true,
+      }));
 
     setImages((prev) => [...prev, ...nextImages]);
     event.target.value = "";
@@ -86,7 +148,15 @@ export default function SearchBar({ onSend, isSending = false }) {
   };
 
   const removeImage = (index) => {
-    setImages((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
+    setImages((prev) => {
+      const image = prev[index];
+
+      if (image?.isObjectUrl) {
+        URL.revokeObjectURL(image.url);
+      }
+
+      return prev.filter((_, itemIndex) => itemIndex !== index);
+    });
   };
 
   const clearPrompt = () => {
@@ -97,20 +167,62 @@ export default function SearchBar({ onSend, isSending = false }) {
     }
   };
 
+  const clearAttachments = () => {
+    images.forEach((image) => {
+      if (image.isObjectUrl) {
+        URL.revokeObjectURL(image.url);
+      }
+    });
+
+    setDocs([]);
+    setImages([]);
+  };
+
+  const buildImagePayload = async () => {
+    const payload = await Promise.all(
+      images.map(async (image, index) => {
+        if (image.data) {
+          return {
+            id: image.id || `stored-${index}`,
+            name: image.name || `image-${index + 1}`,
+            mimeType: image.type,
+            data: image.data,
+          };
+        }
+
+        if (!image.file) {
+          return null;
+        }
+
+        return {
+          id: image.id || fileKey(image.file),
+          name: image.file.name,
+          mimeType: image.file.type,
+          data: await fileToBase64(image.file),
+        };
+      })
+    );
+
+    return payload.filter(Boolean);
+  };
+
   const sendToAi = async () => {
     const text = prompt.trim();
+    const imagePayload = await buildImagePayload();
 
-    if (!text || isSending) {
+    if ((!text && imagePayload.length === 0) || isSending) {
       return;
     }
 
     if (onSend) {
-      await onSend(text);
+      await onSend({ text, images: imagePayload });
       clearPrompt();
+      clearAttachments();
       return;
     }
 
-    sessionStorage.setItem("civiqai_prompt", text);
+    sessionStorage.setItem(PROMPT_SESSION_KEY, text);
+    sessionStorage.setItem(IMAGES_SESSION_KEY, JSON.stringify(imagePayload));
     router.push("/chat");
   };
 
@@ -119,14 +231,21 @@ export default function SearchBar({ onSend, isSending = false }) {
       inputRef.current.textContent = prompt;
     }
 
-    sessionStorage.removeItem("civiqai_prompt");
+    sessionStorage.removeItem(PROMPT_SESSION_KEY);
+    sessionStorage.removeItem(IMAGES_SESSION_KEY);
   }, [prompt]);
 
   useEffect(() => {
     return () => {
-      images.forEach((image) => URL.revokeObjectURL(image.url));
+      images.forEach((image) => {
+        if (image.isObjectUrl) {
+          URL.revokeObjectURL(image.url);
+        }
+      });
     };
   }, [images]);
+
+  const canSend = prompt.trim().length > 0 || images.length > 0;
 
   return (
     <div className="relative mx-auto flex w-full max-w-3xl flex-col gap-3 px-1 sm:px-0">
@@ -154,12 +273,12 @@ export default function SearchBar({ onSend, isSending = false }) {
 
           {images.map((image, index) => (
             <span
-              key={`img-${fileKey(image.file)}`}
+              key={`img-${imageKey(image, index)}`}
               className="group relative flex h-18 w-18 items-center justify-center gap-2 rounded-2xl bg-[#ccc8c5] text-xs text-stone-700 dark:bg-[#272320] dark:text-stone-200 sm:h-22 sm:w-22"
             >
               <img
                 src={image.url}
-                alt={image.file.name}
+                alt={image.name}
                 className="h-12 w-12 rounded-md object-cover sm:h-15 sm:w-15"
               />
               <button
@@ -228,15 +347,13 @@ export default function SearchBar({ onSend, isSending = false }) {
           <div className="self-end sm:self-auto">
             <CustomTooltip
               content={
-                prompt.trim().length === 0
-                  ? "Give the scheme or document, first"
-                  : "Ask"
+                !canSend ? "Add text or an image first" : "Ask"
               }
             >
               <span className="inline-flex">
                 <button
                   type="button"
-                  disabled={prompt.trim().length === 0 || isSending}
+                  disabled={!canSend || isSending}
                   onClick={sendToAi}
                   className="inline-flex h-8 w-8 cursor-pointer items-center justify-center text-stone-900 duration-250 hover:-rotate-27 hover:text-stone-700 dark:text-stone-100 dark:hover:text-stone-400 disabled:pointer-events-none disabled:cursor-default disabled:opacity-60 disabled:hover:rotate-0 disabled:hover:text-stone-900 dark:disabled:hover:text-stone-100"
                 >
