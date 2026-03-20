@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
-import { getRequiredSession } from "@/lib/auth";
-import { decryptJson } from "@/lib/crypto";
-import { connectDb } from "@/lib/mongoose";
-import User from "@/model/User";
+import { NextResponse } from "next/server"
+import { getRequiredSession } from "@/lib/auth"
+import { decryptJson } from "@/lib/crypto"
+import { connectDb } from "@/lib/mongoose"
+import User from "@/model/User"
 
 function readChatText(payload) {
   try {

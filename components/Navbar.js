@@ -1,11 +1,11 @@
 ﻿"use client";
 
-import ThemeToggle from "@/components/ThemeToggle";
-import Link from "next/link";
-import Logo from "@/assets/logo.svg";
-import LoadingDots from "@/components/LoadingDots";
-import { usePathname } from "next/navigation";
-import { signIn, signOut, useSession } from "next-auth/react";
+import ThemeToggle from "@/components/ThemeToggle"
+import Link from "next/link"
+import Logo from "@/assets/logo.svg"
+import LoadingDots from "@/components/LoadingDots"
+import { usePathname } from "next/navigation"
+import { signIn, signOut, useSession } from "next-auth/react"
 
 const Navbar = ({ userImageUrl = "", userName = "User" }) => {
   const pathname = usePathname();
@@ -38,16 +38,8 @@ const Navbar = ({ userImageUrl = "", userName = "User" }) => {
                 <ThemeToggle />
                 {session?.user ? (
                   <div className="relative">
-                    <input
-                      id="profile-menu-toggle"
-                      type="checkbox"
-                      className="peer sr-only"
-                    />
-                    <label
-                      htmlFor="profile-menu-toggle"
-                      className="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-white/20 text-white font-semibold cursor-pointer sm:h-10 sm:w-10"
-                      aria-label="Toggle profile menu"
-                    >
+                    <input id="profile-menu-toggle" type="checkbox" className="peer sr-only" />
+                    <label htmlFor="profile-menu-toggle" className="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-white/20 text-white font-semibold cursor-pointer sm:h-10 sm:w-10" aria-label="Toggle profile menu" >
                       {imageUrl ? (
                         <img
                           src={imageUrl}
@@ -63,37 +55,17 @@ const Navbar = ({ userImageUrl = "", userName = "User" }) => {
                         <h1 className="text-lg font-semibold text-stone-800 dark:text-stone-100 sm:text-xl">
                           {displayName}
                         </h1>
-                        <label
-                          htmlFor="profile-menu-toggle"
-                          className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-stone-200/80 text-sm font-semibold text-stone-700 hover:bg-stone-200 dark:bg-stone-700 dark:text-stone-100 dark:hover:bg-stone-600 cursor-pointer sm:text-md"
-                          aria-label="Close profile menu"
-                        >
-                          ×
-                        </label>
+                        <label htmlFor="profile-menu-toggle" className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-stone-200/80 text-sm font-semibold text-stone-700 hover:bg-stone-200 dark:bg-stone-700 dark:text-stone-100 dark:hover:bg-stone-600 cursor-pointer sm:text-md" aria-label="Close profile menu" >×</label>
                       </div>
                       <ul className="mt-3 flex flex-col gap-2 text-base text-stone-800 dark:text-stone-100 sm:text-lg">
                         <li>
-                          <Link
-                            href="/chat"
-                            className="block rounded-lg px-3 py-2 hover:bg-stone-200 dark:hover:bg-stone-700"
-                          >
-                            History
-                          </Link>
+                          <Link href="/chat" className="block rounded-lg px-3 py-2 hover:bg-stone-200 dark:hover:bg-stone-700" > History </Link>
                         </li>
                         <li>
-                          <Link
-                            href="/saved"
-                            className="block rounded-lg px-3 py-2 hover:bg-stone-200 dark:hover:bg-stone-700"
-                          >
-                            Saved messages
-                          </Link>
+                          <Link href="/saved" className="block rounded-lg px-3 py-2 hover:bg-stone-200 dark:hover:bg-stone-700" > Saved messages </Link>
                         </li>
                         <li>
-                          <button
-                            type="button"
-                            onClick={() => signOut()}
-                            className="w-full rounded-lg px-3 py-2 text-left cursor-pointer hover:bg-stone-200/70 dark:hover:bg-stone-700"
-                          >
+                          <button type="button" onClick={() => signOut()} className="w-full rounded-lg px-3 py-2 text-left cursor-pointer hover:bg-stone-200/70 dark:hover:bg-stone-700" >
                             Sign out
                           </button>
                         </li>
@@ -101,17 +73,13 @@ const Navbar = ({ userImageUrl = "", userName = "User" }) => {
                     </div>
                   </div>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => signIn()}
-                    className={`inline-flex items-center gap-2 rounded-full bg-white/20 px-3 text-sm font-medium text-white shadow-sm duration-200 cursor-pointer hover:bg-stone-700 dark:bg-stone-950/30 dark:text-stone-100 sm:px-4 sm:text-md ${isLoading ? "pb-4 pt-2 sm:pb-5" : "py-1"}`}
-                  >
+                  <button type="button" onClick={() => signIn()} className={`inline-flex items-center gap-2 rounded-full bg-white/20 px-3 text-sm font-medium text-white shadow-sm duration-200 cursor-pointer hover:bg-stone-700 dark:bg-stone-950/30 dark:text-stone-100 sm:px-4 sm:text-md ${isLoading ? "pb-4 pt-2 sm:pb-5" : "py-1"}`}>
                     {isLoading ? (
                       <LoadingDots />
                     ) : (
                       "Sign in"
                     )}
-                   </button>
+                  </button>
                 )}
               </div>
             </div>

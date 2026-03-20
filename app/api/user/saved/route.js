@@ -1,9 +1,9 @@
-import { NextResponse } from "next/server";
-import mongoose from "mongoose";
+import { NextResponse } from "next/server"
+import mongoose from "mongoose"
 
-import { getRequiredSession } from "@/lib/auth";
-import { connectDb } from "@/lib/mongoose";
-import User from "@/model/User";
+import { getRequiredSession } from "@/lib/auth"
+import { connectDb } from "@/lib/mongoose"
+import User from "@/model/User"
 
 export async function POST(req) {
   try {

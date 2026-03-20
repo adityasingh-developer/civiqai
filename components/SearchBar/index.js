@@ -1,17 +1,17 @@
 ﻿"use client";
 
-import { useRouter } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useRouter } from "next/navigation"
+import { useEffect, useRef } from "react"
 
-import Send from "@/assets/send.svg";
-import CustomTooltip from "@/components/customTooltip";
-import { clearPendingImageRefs } from "@/lib/browserImageCache";
+import Send from "@/assets/send.svg"
+import CustomTooltip from "@/components/customTooltip"
+import { clearPendingImageRefs } from "@/lib/browserImageCache"
 
 import AttachmentPreviewList from "./AttachmentPreviewList";
-import { DOCUMENT_ACCEPT, IMAGE_ACCEPT, PROMPT_SESSION_KEY } from "./constants";
-import SearchInput from "./SearchInput";
-import { useSearchBarAttachments } from "./useSearchBarAttachments";
-import { useSearchBarInput } from "./useSearchBarInput";
+import { DOCUMENT_ACCEPT, IMAGE_ACCEPT, PROMPT_SESSION_KEY } from "./constants"
+import SearchInput from "./SearchInput"
+import { useSearchBarAttachments } from "./useSearchBarAttachments"
+import { useSearchBarInput } from "./useSearchBarInput"
 
 export default function SearchBar({ onSend, isSending = false }) {
   const router = useRouter();
@@ -19,14 +19,14 @@ export default function SearchBar({ onSend, isSending = false }) {
     typeof window !== "undefined"
       ? sessionStorage.getItem(PROMPT_SESSION_KEY) || ""
       : "";
-  const { prompt, inputRef, normalizeText, insertTextAtCursor, clearPrompt } = useSearchBarInput(initialPrompt);
-  const { images, uploadError, onPickImages, onPickDocuments, removeImage, clearAttachments, buildImagePayload, persistPendingImages } = useSearchBarAttachments();
-  const imageInputRef = useRef(null);
-  const documentInputRef = useRef(null);
+  const { prompt, inputRef, normalizeText, insertTextAtCursor, clearPrompt } = useSearchBarInput(initialPrompt)
+  const { images, uploadError, onPickImages, onPickDocuments, removeImage, clearAttachments, buildImagePayload, persistPendingImages } = useSearchBarAttachments()
+  const imageInputRef = useRef(null)
+  const documentInputRef = useRef(null)
 
   useEffect(() => {
     if (onSend) {
-      sessionStorage.removeItem(PROMPT_SESSION_KEY);
+      sessionStorage.removeItem(PROMPT_SESSION_KEY)
       clearPendingImageRefs();
     }
   }, [onSend]);
@@ -45,15 +45,15 @@ export default function SearchBar({ onSend, isSending = false }) {
     }
 
     if (onSend) {
-      await onSend({ text, images: imagePayload });
-      clearPrompt();
-      clearAttachments();
+      await onSend({ text, images: imagePayload })
+      clearPrompt()
+      clearAttachments()
       return;
     }
 
-    sessionStorage.setItem(PROMPT_SESSION_KEY, text);
-    persistPendingImages(imagePayload);
-    router.push("/chat");
+    sessionStorage.setItem(PROMPT_SESSION_KEY, text)
+    persistPendingImages(imagePayload)
+    router.push("/chat")
   };
 
   const canSend = prompt.trim().length > 0 || images.length > 0;

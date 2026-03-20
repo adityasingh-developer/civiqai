@@ -1,8 +1,8 @@
-﻿import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react"
 
 export function useSearchBarInput(initialPrompt = "") {
-  const [prompt, setPrompt] = useState(initialPrompt);
-  const inputRef = useRef(null);
+  const [prompt, setPrompt] = useState(initialPrompt)
+  const inputRef = useRef(null)
 
   const normalizeText = (element) => {
     const raw = element.textContent ?? "";
@@ -59,17 +59,17 @@ export function useSearchBarInput(initialPrompt = "") {
 
     const focusInput = () => {
       input.focus();
-      const selection = window.getSelection();
-      const range = document.createRange();
-      range.selectNodeContents(input);
-      range.collapse(false);
-      selection?.removeAllRanges();
-      selection?.addRange(range);
+      const selection = window.getSelection()
+      const range = document.createRange()
+      range.selectNodeContents(input)
+      range.collapse(false)
+      selection?.removeAllRanges()
+      selection?.addRange(range)
     };
 
     const timeout = window.setTimeout(focusInput, 0);
     return () => window.clearTimeout(timeout);
-  }, []);
+  }, [])
 
   return {
     prompt,
@@ -77,5 +77,5 @@ export function useSearchBarInput(initialPrompt = "") {
     normalizeText,
     insertTextAtCursor,
     clearPrompt,
-  };
+  }
 }

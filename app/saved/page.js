@@ -1,28 +1,21 @@
 ﻿"use client";
 
-import { Copy, Download, X } from "lucide-react";
-import { signIn, useSession } from "next-auth/react";
-import { useEffect, useState } from "react";
+import { Copy, Download, X } from "lucide-react"
+import { signIn, useSession } from "next-auth/react"
+import { useEffect, useState } from "react"
 
-import LoadingDots from "@/components/LoadingDots";
-import MarkdownMessage from "@/components/MarkdownMessage";
-import MessageAttachments from "@/components/MessageAttachments";
-import CustomTooltip from "@/components/customTooltip";
+import LoadingDots from "@/components/LoadingDots"
+import MarkdownMessage from "@/components/MarkdownMessage"
+import MessageAttachments from "@/components/MessageAttachments"
+import CustomTooltip from "@/components/customTooltip"
 import {
   buildSavedMessagesFromChats,
   removeSavedMessageFromChats,
 } from "@/lib/chatSaved";
-import { readUserCache, writeUserCache } from "@/lib/localCache";
-import { exportSavedMessagePdf } from "@/lib/pdfExport";
+import { readUserCache, writeUserCache } from "@/lib/localCache"
+import { exportSavedMessagePdf } from "@/lib/pdfExport"
 
-const formatSavedTime = (timestamp) =>
-  new Date(timestamp).toLocaleString([], {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+const formatSavedTime = (timestamp) => new Date(timestamp).toLocaleString([], { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
 export default function SavedPage() {
   const { data: session, status } = useSession();
@@ -178,10 +171,7 @@ export default function SavedPage() {
         ) : (
           <div className="flex flex-col gap-4">
             {savedMessages.map((message) => (
-              <article
-                key={message.id}
-                className="rounded-2xl border border-stone-200/70 bg-white/70 p-4 shadow-sm backdrop-blur dark:border-stone-700/70 dark:bg-stone-900/60"
-              >
+              <article key={message.id} className="rounded-2xl border border-stone-200/70 bg-white/70 p-4 shadow-sm backdrop-blur dark:border-stone-700/70 dark:bg-stone-900/60" >
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="text-sm font-semibold uppercase tracking-[0.18em] text-stone-500 dark:text-stone-400">
@@ -193,34 +183,20 @@ export default function SavedPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <CustomTooltip content="Export PDF">
-                      <button
-                        type="button"
-                        onClick={() => handleExportPdf(message)}
-                        disabled={exportingIds.has(message.id)}
-                        className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-stone-200/80 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-300 disabled:cursor-default disabled:opacity-60 dark:bg-stone-700 dark:text-stone-100 dark:hover:bg-stone-600"
-                      >
+                      <button type="button" onClick={() => handleExportPdf(message)} disabled={exportingIds.has(message.id)} className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-stone-200/80 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-300 disabled:cursor-default disabled:opacity-60 dark:bg-stone-700 dark:text-stone-100 dark:hover:bg-stone-600" >
                         <Download className="h-4 w-4" />
                         {exportingIds.has(message.id) ? "Exporting" : "PDF"}
                       </button>
                     </CustomTooltip>
 
                     <CustomTooltip content="Remove">
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveSaved(message)}
-                        disabled={removingIds.has(message.id)}
-                        className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-stone-200/80 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-300 disabled:cursor-default disabled:opacity-60 dark:bg-stone-700 dark:text-stone-100 dark:hover:bg-stone-600"
-                      >
+                      <button type="button" onClick={() => handleRemoveSaved(message)} disabled={removingIds.has(message.id)} className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-stone-200/80 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-300 disabled:cursor-default disabled:opacity-60 dark:bg-stone-700 dark:text-stone-100 dark:hover:bg-stone-600" >
                         <X className="h-4 w-4" />
                       </button>
                     </CustomTooltip>
 
                     <CustomTooltip content="Copy">
-                      <button
-                        type="button"
-                        onClick={() => handleCopy(message)}
-                        className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-stone-200/80 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-300 dark:bg-stone-700 dark:text-stone-100 dark:hover:bg-stone-600"
-                      >
+                      <button type="button" onClick={() => handleCopy(message)} className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-stone-200/80 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-300 dark:bg-stone-700 dark:text-stone-100 dark:hover:bg-stone-600" >
                         <Copy className="h-4 w-4" />
                         {copiedId === message.id ? "Copied" : ""}
                       </button>

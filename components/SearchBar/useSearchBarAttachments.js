@@ -1,26 +1,22 @@
-﻿import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react"
 
-import { cacheImageFile, clearPendingImageRefs, getCachedImageBlob, getCachedImageData, readPendingImageRefs, writePendingImageRefs } from "@/lib/browserImageCache";
+import { cacheImageFile, clearPendingImageRefs, getCachedImageBlob, getCachedImageData, readPendingImageRefs, writePendingImageRefs } from "@/lib/browserImageCache"
 
-import {
-  DOCUMENT_TYPES,
-  IMAGE_TYPES,
-  MAX_TOTAL_UPLOAD_BYTES,
-} from "./constants";
+import { DOCUMENT_TYPES, IMAGE_TYPES, MAX_TOTAL_UPLOAD_BYTES } from "./constants"
 
 function revokeImageUrls(images) {
   images.forEach((image) => {
     if (image.isObjectUrl && image.url) {
-      URL.revokeObjectURL(image.url);
+      URL.revokeObjectURL(image.url)
     }
-  });
+  })
 }
 
 async function buildPendingImages() {
   const pendingImages = readPendingImageRefs();
 
   if (!pendingImages.length) {
-    return [];
+    return []
   }
 
   const images = await Promise.all(
@@ -37,9 +33,9 @@ async function buildPendingImages() {
         size: image.size || blob?.size || 0,
         url: imageUrl,
         isObjectUrl: Boolean(imageUrl),
-      };
+      }
     })
-  );
+  )
 
   return images;
 }
@@ -51,12 +47,12 @@ function fileToBase64(file) {
     reader.onload = () => {
       const result = typeof reader.result === "string" ? reader.result : "";
       const [, data = ""] = result.split(",");
-      resolve(data);
-    };
+      resolve(data)
+    }
 
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(file);
-  });
+  })
 }
 
 export function useSearchBarAttachments() {
@@ -105,8 +101,8 @@ export function useSearchBarAttachments() {
         size: file.size,
         url: URL.createObjectURL(file),
         isObjectUrl: true,
-      });
-    });
+      })
+    })
 
     setUploadError(
       rejectedCount > 0
@@ -114,26 +110,26 @@ export function useSearchBarAttachments() {
             rejectedCount === 1 ? "" : "s"
           } not added.`
         : ""
-    );
+    )
 
     if (nextImages.length > 0) {
       setImages((prev) => [...prev, ...nextImages]);
     }
-  };
+  }
 
   const onPickImages = (event) => {
     const files = Array.from(event.target.files || []);
     const validImages = files.filter((file) => IMAGE_TYPES.includes(file.type));
     appendFilesWithinLimit(validImages);
     event.target.value = "";
-  };
+  }
 
   const onPickDocuments = (event) => {
     const files = Array.from(event.target.files || []);
     const validDocuments = files.filter((file) => DOCUMENT_TYPES.includes(file.type));
     appendFilesWithinLimit(validDocuments);
     event.target.value = "";
-  };
+  }
 
   const removeImage = (index) => {
     setUploadError("");
@@ -145,15 +141,15 @@ export function useSearchBarAttachments() {
       }
 
       return prev.filter((_, itemIndex) => itemIndex !== index);
-    });
-  };
+    })
+  }
 
   const clearAttachments = () => {
     revokeImageUrls(images);
     clearPendingImageRefs();
     setImages([]);
     setUploadError("");
-  };
+  }
 
   const buildImagePayload = async () => {
     const payload = await Promise.all(
@@ -171,7 +167,7 @@ export function useSearchBarAttachments() {
             size: image.file.size,
             data: await fileToBase64(image.file),
             previewUrl: image.url || null,
-          };
+          }
         }
 
         if (!image.cacheKey) {
@@ -190,12 +186,12 @@ export function useSearchBarAttachments() {
           size: image.size || 0,
           data,
           previewUrl: image.url || null,
-        };
+        }
       })
-    );
+    )
 
     return payload.filter(Boolean);
-  };
+  }
 
   const persistPendingImages = (imagePayload) => {
     writePendingImageRefs(
@@ -205,8 +201,8 @@ export function useSearchBarAttachments() {
         mimeType: image.mimeType,
         size: image.size || 0,
       }))
-    );
-  };
+    )
+  }
 
   useEffect(() => {
     let isMounted = true;
@@ -218,21 +214,21 @@ export function useSearchBarAttachments() {
         setImages((currentImages) => {
           revokeImageUrls(currentImages);
           return pendingImages;
-        });
+        })
       }
-    };
+    }
 
     loadPendingImages();
 
     return () => {
       isMounted = false;
-    };
-  }, []);
+    }
+  }, [])
 
   useEffect(() => {
     return () => {
       revokeImageUrls(images);
-    };
+    }
   }, [images]);
 
   return {
@@ -244,5 +240,5 @@ export function useSearchBarAttachments() {
     clearAttachments,
     buildImagePayload,
     persistPendingImages,
-  };
+  }
 }

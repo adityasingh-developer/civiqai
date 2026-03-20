@@ -1,19 +1,14 @@
 "use client";
 
-import { Bookmark, BookmarkCheck, Copy } from "lucide-react";
-import { signIn, useSession } from "next-auth/react";
-import { useEffect, useRef, useState } from "react";
+import { Bookmark, BookmarkCheck, Copy } from "lucide-react"
+import { signIn, useSession } from "next-auth/react"
+import { useEffect, useRef, useState } from "react"
 
-import LoadingDots from "@/components/LoadingDots";
-import MessageAttachments from "@/components/MessageAttachments";
-import MarkdownMessage from "@/components/MarkdownMessage";
-import SearchBar from "@/components/SearchBar";
-import {
-  buildChatMessages,
-  formatChatTime,
-  toggleSavedState,
-  writeChatCaches,
-} from "@/lib/chatPage";
+import LoadingDots from "@/components/LoadingDots"
+import MessageAttachments from "@/components/MessageAttachments"
+import MarkdownMessage from "@/components/MarkdownMessage"
+import SearchBar from "@/components/SearchBar"
+import { buildChatMessages, formatChatTime, toggleSavedState, writeChatCaches } from "@/lib/chatPage";
 import { readUserCache } from "@/lib/localCache";
 
 export default function ChatPage() {
@@ -50,9 +45,8 @@ export default function ChatPage() {
 
     const loadUserData = async () => {
       try {
-        const res = await fetch("/api/user/me", { cache: "no-store" });
-        const data = await res.json();
-
+        const res = await fetch("/api/user/me", { cache: "no-store" })
+        const data = await res.json()
         if (!res.ok) {
           throw new Error(data?.error || "Failed to load chats");
         }
@@ -80,7 +74,7 @@ export default function ChatPage() {
     return () => {
       isMounted = false;
     };
-  }, [status, userEmail]);
+  }, [status, userEmail])
 
   useEffect(() => {
     if (status !== "authenticated") {
@@ -89,7 +83,7 @@ export default function ChatPage() {
 
     const timer = setTimeout(() => {
       endRef.current?.scrollIntoView({ behavior: "auto", block: "end" });
-    }, 0);
+    }, 0)
 
     return () => clearTimeout(timer);
   }, [status, messages.length]);
@@ -113,12 +107,7 @@ export default function ChatPage() {
     // console.log("toggle save clicked", { chatId: message.chatId, role: message.role, isSaved });
     const optimisticCreatedAt = new Date().toISOString();
     const previousHistory = history;
-    const optimisticHistory = toggleSavedState(
-      history,
-      message,
-      isSaved,
-      optimisticCreatedAt
-    );
+    const optimisticHistory = toggleSavedState( history, message, isSaved, optimisticCreatedAt );
 
     setSavingIds((prev) => new Set(prev).add(message.id));
     setHistory(optimisticHistory);
@@ -133,7 +122,7 @@ export default function ChatPage() {
           chatId: message.chatId,
           role: message.role,
         }),
-      });
+      })
 
       const data = await res.json();
       if (!res.ok) {
@@ -161,9 +150,9 @@ export default function ChatPage() {
         const next = new Set(prev);
         next.delete(message.id);
         return next;
-      });
+      })
     }
-  };
+  }
 
   const handleSend = async ({ text = "", images = [] }) => {
     setIsSending(true);
@@ -295,18 +284,14 @@ export default function ChatPage() {
                   key={message.id}
                   className={`flex flex-col ${message.role === "user" ? "items-end" : "items-start"}`}
                 >
-                    <MessageAttachments images={message.images} />
-                  <div
-                    className={`group relative max-w-[92%] rounded-2xl text-md leading-relaxed shadow-sm sm:max-w-[70%] w-fit ${
-                      message.images?.length
+                  <MessageAttachments images={message.images} />
+                  <div className={`group relative max-w-[92%] rounded-2xl text-md leading-relaxed shadow-sm sm:max-w-[70%] w-fit ${message.images?.length
                         ? "px-2 pb-2 pt-2 sm:px-2.5 sm:pb-2.5 sm:pt-2.5"
                         : "px-4 py-3"
-                    } ${
-                      message.role === "user"
+                      } ${message.role === "user"
                         ? "bg-stone-900 text-stone-50 dark:bg-stone-100 dark:text-stone-900"
                         : "bg-stone-100 text-stone-800 dark:bg-stone-800 dark:text-stone-100"
-                    }`}
-                  >
+                      }`} >
                     {message.loading ? (
                       <LoadingDots className="text-stone-800 dark:text-stone-100" />
                     ) : message.role === "assistant" ? (
@@ -321,25 +306,14 @@ export default function ChatPage() {
                     </div>
                     {!message.loading && (
                       <div className="absolute right-3 top-3 flex items-center gap-2 opacity-0 transition group-hover:opacity-100">
-                        <button
-                          type="button"
-                          onClick={() => handleToggleSaved(message)}
-                          className="inline-flex cursor-pointer items-center justify-center rounded-full bg-stone-200/70 p-1.5 text-stone-700 transition dark:bg-stone-700/90 dark:text-stone-100"
-                          aria-label={message.saved ? "Unsave message" : "Save message"}
-                          disabled={savingIds.has(message.id)}
-                        >
+                        <button type="button" onClick={() => handleToggleSaved(message)} className="inline-flex cursor-pointer items-center justify-center rounded-full bg-stone-200/70 p-1.5 text-stone-700 transition dark:bg-stone-700/90 dark:text-stone-100" aria-label={message.saved ? "Unsave message" : "Save message"} disabled={savingIds.has(message.id)} >
                           {message.saved ? (
                             <BookmarkCheck className="h-3.5 w-3.5" />
                           ) : (
                             <Bookmark className="h-3.5 w-3.5" />
                           )}
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => handleCopy(message)}
-                          className="inline-flex cursor-pointer items-center justify-center rounded-full bg-stone-200/70 p-1.5 text-stone-700 transition dark:bg-stone-700/90 dark:text-stone-100"
-                          aria-label={copiedId === message.id ? "Copied" : "Copy"}
-                        >
+                        <button type="button" onClick={() => handleCopy(message)} className="inline-flex cursor-pointer items-center justify-center rounded-full bg-stone-200/70 p-1.5 text-stone-700 transition dark:bg-stone-700/90 dark:text-stone-100" aria-label={copiedId === message.id ? "Copied" : "Copy"} >
                           <Copy className="h-3.5 w-3.5" />
                         </button>
                       </div>

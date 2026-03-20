@@ -1,10 +1,10 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 // import Groq from "groq-sdk";
 
-import { decryptJson, encryptJson } from "@/lib/crypto";
-import { getRequiredSession } from "@/lib/auth";
-import { connectDb } from "@/lib/mongoose";
-import User from "@/model/User";
+import { decryptJson, encryptJson } from "@/lib/crypto"
+import { getRequiredSession } from "@/lib/auth"
+import { connectDb } from "@/lib/mongoose"
+import User from "@/model/User"
 
 const SYSTEM_PROMPT =
   "You only answer about real government/public schemes, policies, or programs from any country. " +
@@ -32,7 +32,7 @@ function isDbUnavailableError(error) {
       error.code === "ECONNREFUSED" ||
       error.syscall === "querySrv"
     )
-  );
+  )
 }
 
 function buildGeminiHistory(history) {
@@ -48,8 +48,8 @@ function buildGeminiHistory(history) {
         role: message?.role === "assistant" ? "model" : "user",
         parts: [{ text }],
       },
-    ];
-  });
+    ]
+  })
 }
 
 function buildGeminiParts(message, images) {
@@ -69,8 +69,8 @@ function buildGeminiParts(message, images) {
         data: image.data,
         mimeType: image.mimeType,
       },
-    });
-  });
+    })
+  })
 
   return parts;
 }
@@ -146,10 +146,7 @@ export async function POST(req) {
 
     const chatSession = model.startChat({
       history: buildGeminiHistory(dbHistory),
-      generationConfig: {
-        temperature: 0.4,
-        maxOutputTokens: 700,
-      },
+      generationConfig: { temperature: 0.4, maxOutputTokens: 900 },
     });
 
     const result = await chatSession.sendMessage(
