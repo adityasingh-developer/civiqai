@@ -1,13 +1,6 @@
 ﻿import { useEffect, useState } from "react";
 
-import {
-  cacheImageFile,
-  clearPendingImageRefs,
-  getCachedImageBlob,
-  getCachedImageData,
-  readPendingImageRefs,
-  writePendingImageRefs,
-} from "@/lib/browserImageCache";
+import { cacheImageFile, clearPendingImageRefs, getCachedImageBlob, getCachedImageData, readPendingImageRefs, writePendingImageRefs } from "@/lib/browserImageCache";
 
 import {
   DOCUMENT_TYPES,

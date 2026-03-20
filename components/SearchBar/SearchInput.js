@@ -14,26 +14,16 @@
       )}
 
       <div className="grid">
-        <p
-          aria-hidden="true"
-          className="pointer-events-none col-start-1 row-start-1 m-0 min-h-10 max-h-50 w-full select-none overflow-hidden whitespace-pre-wrap break-words p-0 text-base text-transparent sm:text-lg"
-        >
+        <p aria-hidden="true" className="pointer-events-none col-start-1 row-start-1 m-0 min-h-10 max-h-50 w-full select-none overflow-hidden whitespace-pre-wrap break-words p-0 text-base text-transparent sm:text-lg">
           {prompt || ""}
         </p>
-        <p
-          ref={inputRef}
-          contentEditable
-          suppressContentEditableWarning
-          role="textbox"
-          aria-label="Ask CiviqAI"
-          className="ask-input col-start-1 row-start-1 m-0 min-h-10 max-h-45 w-full overflow-hidden whitespace-pre-wrap break-words bg-transparent p-0 text-base outline-none hover:overflow-y-auto sm:text-lg"
-          onInput={(event) => normalizeText(event.currentTarget)}
-          onPaste={(event) => {
+        <p ref={inputRef} contentEditable suppressContentEditableWarning role="textbox" aria-label="Ask CiviqAI" className="ask-input col-start-1 row-start-1 m-0 min-h-10 max-h-45 w-full overflow-hidden whitespace-pre-wrap break-words bg-transparent p-0 text-base outline-none hover:overflow-y-auto sm:text-lg" onInput={(event) => normalizeText(event.currentTarget)} 
+        onPaste={(event) => {
             event.preventDefault();
             const text = event.clipboardData.getData("text/plain");
             insertTextAtCursor(text);
             normalizeText(event.currentTarget);
-          }}
+          }} 
           onKeyDown={(event) => {
             if (event.ctrlKey && event.key === "Enter") {
               event.preventDefault();
