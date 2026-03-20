@@ -214,7 +214,7 @@ export default function ChatPage() {
           history: messages
             .filter((message) => !message.loading)
             .map((message) => ({ role: message.role, content: message.text }))
-            .slice(-12),
+            .slice(-4),
         }),
       });
 

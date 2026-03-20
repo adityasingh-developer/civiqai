@@ -7,14 +7,13 @@ import User from "@/model/User";
 
 export async function POST(req) {
   try {
-    const session = await getRequiredSession();
+    const session = await getRequiredSession(req);
 
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { chatId, role } = await req.json();
-    // console.log("save message request", { chatId, role, email: session?.user?.email });
 
     if (!chatId || !["user", "assistant"].includes(role)) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
@@ -69,14 +68,13 @@ export async function POST(req) {
 
 export async function DELETE(req) {
   try {
-    const session = await getRequiredSession();
+    const session = await getRequiredSession(req);
 
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { chatId, role } = await req.json();
-    // console.log("unsave message request", { chatId, role });
 
     if (!chatId || !["user", "assistant"].includes(role)) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });

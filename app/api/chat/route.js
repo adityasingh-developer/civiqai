@@ -15,6 +15,26 @@ const SYSTEM_PROMPT =
 
 const GOOGLE_MODEL = "gemini-2.5-flash";
 
+function readChatText(payload) {
+  try {
+    const value = decryptJson(payload);
+    return typeof value === "string" ? value : "";
+  } catch {
+    return typeof payload === "string" && !payload.includes(".") ? payload : "";
+  }
+}
+
+function isDbUnavailableError(error) {
+  return Boolean(
+    error && (
+      error.name === "MongoServerSelectionError" ||
+      error.name === "MongoNetworkError" ||
+      error.code === "ECONNREFUSED" ||
+      error.syscall === "querySrv"
+    )
+  );
+}
+
 function buildGeminiHistory(history) {
   return history.flatMap((message) => {
     const text = `${message?.content || message?.text || ""}`.trim();
@@ -57,8 +77,7 @@ function buildGeminiParts(message, images) {
 
 export async function POST(req) {
   try {
-    const session = await getRequiredSession();
-    // console.log("chat route hit", { email: session?.user?.email });
+    const session = await getRequiredSession(req);
 
     if (!session) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -94,24 +113,29 @@ export async function POST(req) {
         name: image.name,
         mimeType: image.mimeType,
       }));
-    // console.log("incoming chat payload", { history: history.length, images: promptImages.length });
 
     if (!finalMessage && images.length === 0) {
       return Response.json({ error: "Missing message" }, { status: 400 });
     }
 
     await connectDb();
-    const user = await User.findOne({ email: session.user.email });
+    let user = await User.findOne({ email: session.user.email });
 
     if (!user) {
-      return Response.json({ error: "User not found" }, { status: 404 });
+      user = await User.create({
+        email: session.user.email,
+        name: session.user.name || "",
+        image: session.user.image || "",
+        provider: "google",
+        lastLogin: new Date(),
+      });
     }
 
     const dbHistory = history.length
       ? history
       : (user.chatHistory || []).slice(-6).flatMap((chat) => [
-          { role: "user", content: decryptJson(chat.promptEnc) },
-          { role: "assistant", content: decryptJson(chat.answerEnc) },
+          { role: "user", content: readChatText(chat.promptEnc) },
+          { role: "assistant", content: readChatText(chat.answerEnc) },
         ]);
 
     const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY);
@@ -119,7 +143,6 @@ export async function POST(req) {
       model: GOOGLE_MODEL,
       systemInstruction: SYSTEM_PROMPT,
     });
-    // const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
     const chatSession = model.startChat({
       history: buildGeminiHistory(dbHistory),
@@ -129,7 +152,6 @@ export async function POST(req) {
       },
     });
 
-    // console.log("chat payload", { user: session.user.email, images: images.length });
     const result = await chatSession.sendMessage(
       buildGeminiParts(finalMessage, images)
     );
@@ -170,6 +192,14 @@ export async function POST(req) {
     });
   } catch (error) {
     console.error("Gemini error:", error);
+
+    if (isDbUnavailableError(error)) {
+      return Response.json(
+        { error: "Database connection failed. Check MongoDB Atlas or your network/DNS." },
+        { status: 503 }
+      );
+    }
+
     return Response.json({ error: "Server error" }, { status: 500 });
   }
 }

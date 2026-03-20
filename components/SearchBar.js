@@ -18,6 +18,7 @@ import {
 const PROMPT_SESSION_KEY = "civiqai_prompt";
 const IMAGE_TYPES = ["image/png", "image/jpeg"];
 const DOCUMENT_TYPES = ["application/pdf", "text/plain"];
+const MAX_TOTAL_UPLOAD_BYTES = 20 * 1024 * 1024;
 
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
@@ -60,6 +61,7 @@ async function buildPendingImages() {
         cacheKey: image.cacheKey,
         name: image.name || `image-${index + 1}`,
         type: image.mimeType,
+        size: image.size || blob?.size || 0,
         url: imageUrl,
         isObjectUrl: Boolean(imageUrl),
       };
@@ -77,6 +79,7 @@ export default function SearchBar({ onSend, isSending = false }) {
       : ""
   );
   const [images, setImages] = useState([]);
+  const [uploadError, setUploadError] = useState("");
   const imageInputRef = useRef(null);
   const documentInputRef = useRef(null);
   const inputRef = useRef(null);
@@ -86,6 +89,11 @@ export default function SearchBar({ onSend, isSending = false }) {
 
   const imageKey = (image, index) =>
     image.file ? fileKey(image.file) : image.cacheKey || image.id || `${image.name}-${index}`;
+
+  const getImageSize = (image) => image.file?.size || image.size || 0;
+
+  const getTotalUploadBytes = (items) =>
+    items.reduce((total, item) => total + getImageSize(item), 0);
 
   const normalizeText = (element) => {
     const raw = element.textContent ?? "";
@@ -119,25 +127,55 @@ export default function SearchBar({ onSend, isSending = false }) {
     selection.addRange(range);
   };
 
-  const onPickImages = (event) => {
-    const files = Array.from(event.target.files || []);
-    const validImages = files.filter((file) => IMAGE_TYPES.includes(file.type));
+  const appendFilesWithinLimit = (files) => {
     const existing = new Set(
       images.map((image, index) => imageKey(image, index))
     );
-    const nextImages = validImages
-      .filter((file) => !existing.has(fileKey(file)))
-      .map((file) => ({
-        id: fileKey(file),
+    const nextImages = [];
+    let totalBytes = getTotalUploadBytes(images);
+    let rejectedCount = 0;
+
+    files.forEach((file) => {
+      const nextKey = fileKey(file);
+
+      if (existing.has(nextKey)) {
+        return;
+      }
+
+      if (totalBytes + file.size > MAX_TOTAL_UPLOAD_BYTES) {
+        rejectedCount += 1;
+        return;
+      }
+
+      existing.add(nextKey);
+      totalBytes += file.size;
+      nextImages.push({
+        id: nextKey,
         file,
         cacheKey: null,
         name: file.name,
         type: file.type,
+        size: file.size,
         url: URL.createObjectURL(file),
         isObjectUrl: true,
-      }));
+      });
+    });
 
-    setImages((prev) => [...prev, ...nextImages]);
+    setUploadError(
+      rejectedCount > 0
+        ? `Total upload limit is 20 MB per message. ${rejectedCount} file${rejectedCount === 1 ? "" : "s"} not added.`
+        : ""
+    );
+
+    if (nextImages.length > 0) {
+      setImages((prev) => [...prev, ...nextImages]);
+    }
+  };
+
+  const onPickImages = (event) => {
+    const files = Array.from(event.target.files || []);
+    const validImages = files.filter((file) => IMAGE_TYPES.includes(file.type));
+    appendFilesWithinLimit(validImages);
     event.target.value = "";
   };
 
@@ -146,26 +184,12 @@ export default function SearchBar({ onSend, isSending = false }) {
     const validDocuments = files.filter((file) =>
       DOCUMENT_TYPES.includes(file.type)
     );
-    const existing = new Set(
-      images.map((image, index) => imageKey(image, index))
-    );
-    const nextImages = validDocuments
-      .filter((file) => !existing.has(fileKey(file)))
-      .map((file) => ({
-        id: fileKey(file),
-        file,
-        cacheKey: null,
-        name: file.name,
-        type: file.type,
-        url: URL.createObjectURL(file),
-        isObjectUrl: true,
-      }));
-
-    setImages((prev) => [...prev, ...nextImages]);
+    appendFilesWithinLimit(validDocuments);
     event.target.value = "";
   };
 
   const removeImage = (index) => {
+    setUploadError("");
     setImages((prev) => {
       const image = prev[index];
 
@@ -189,6 +213,7 @@ export default function SearchBar({ onSend, isSending = false }) {
     revokeImageUrls(images);
     clearPendingImageRefs();
     setImages([]);
+    setUploadError("");
   };
 
   const buildImagePayload = async () => {
@@ -204,6 +229,7 @@ export default function SearchBar({ onSend, isSending = false }) {
             cacheKey: cachedImage.cacheKey,
             name: cachedImage.name,
             mimeType: cachedImage.mimeType,
+            size: image.file.size,
             data: await fileToBase64(image.file),
             previewUrl: image.url || null,
           };
@@ -222,6 +248,7 @@ export default function SearchBar({ onSend, isSending = false }) {
           cacheKey: image.cacheKey,
           name: image.name || `image-${index + 1}`,
           mimeType: image.type,
+          size: image.size || 0,
           data,
           previewUrl: image.url || null,
         };
@@ -252,6 +279,7 @@ export default function SearchBar({ onSend, isSending = false }) {
         cacheKey: image.cacheKey,
         name: image.name,
         mimeType: image.mimeType,
+        size: image.size || 0,
       }))
     );
     router.push("/chat");
@@ -389,6 +417,13 @@ export default function SearchBar({ onSend, isSending = false }) {
               </CustomTooltip>
             </div>
           </div>
+          {uploadError ? (
+            <div className="px-4 sm:px-5">
+              <p className="text-xs text-red-700 dark:text-red-400">
+                {uploadError}
+              </p>
+            </div>
+          ) : null}
           </div>
 
           <p className="mt-1 text-center text-sm text-stone-600 dark:text-stone-400">
