@@ -1,25 +1,25 @@
-﻿import { useEffect, useState } from "react"
+import { useEffect, useState } from "react";
 
-import { cacheImageFile, clearPendingImageRefs, getCachedImageBlob, getCachedImageData, readPendingImageRefs, writePendingImageRefs } from "@/lib/browserImageCache"
+import { cacheImageFile, clearPendingImageRefs, getCachedImageBlob, getCachedImageData, readPendingImageRefs, writePendingImageRefs } from "@/lib/browserImageCache";
 
-import { DOCUMENT_TYPES, IMAGE_TYPES, MAX_TOTAL_UPLOAD_BYTES } from "./constants"
+import { DOCUMENT_TYPES, IMAGE_TYPES, MAX_TOTAL_UPLOAD_BYTES, isAllowedAttachment } from "./constants";
 
 function revokeImageUrls(images) {
   images.forEach((image) => {
     if (image.isObjectUrl && image.url) {
-      URL.revokeObjectURL(image.url)
+      URL.revokeObjectURL(image.url);
     }
-  })
+  });
 }
 
 async function buildPendingImages() {
   const pendingImages = readPendingImageRefs();
 
   if (!pendingImages.length) {
-    return []
+    return [];
   }
 
-  const images = await Promise.all(
+  return Promise.all(
     pendingImages.map(async (image, index) => {
       const blob = await getCachedImageBlob(image.cacheKey);
       const imageUrl = blob ? URL.createObjectURL(blob) : null;
@@ -33,11 +33,9 @@ async function buildPendingImages() {
         size: image.size || blob?.size || 0,
         url: imageUrl,
         isObjectUrl: Boolean(imageUrl),
-      }
+      };
     })
-  )
-
-  return images;
+  );
 }
 
 function fileToBase64(file) {
@@ -47,12 +45,35 @@ function fileToBase64(file) {
     reader.onload = () => {
       const result = typeof reader.result === "string" ? reader.result : "";
       const [, data = ""] = result.split(",");
-      resolve(data)
-    }
+
+      resolve(data);
+    };
 
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(file);
-  })
+  });
+}
+
+function buildUploadError(unsupportedCount, rejectedCount) {
+  const messages = [];
+
+  if (unsupportedCount > 0) {
+    messages.push(
+      `${unsupportedCount} unsupported file${
+        unsupportedCount === 1 ? "" : "s"
+      } ignored.`
+    );
+  }
+
+  if (rejectedCount > 0) {
+    messages.push(
+      `Total upload limit is 8 MB per message. ${rejectedCount} file${
+        rejectedCount === 1 ? "" : "s"
+      } not added.`
+    );
+  }
+
+  return messages.join(" ");
 }
 
 export function useSearchBarAttachments() {
@@ -73,12 +94,20 @@ export function useSearchBarAttachments() {
     items.reduce((total, item) => total + getImageSize(item), 0);
 
   const appendFilesWithinLimit = (files) => {
-    const existing = new Set(images.map((image, index) => imageKey(image, index)));
+    const existing = new Set(
+      images.map((image, index) => imageKey(image, index))
+    );
     const nextImages = [];
     let totalBytes = getTotalUploadBytes(images);
     let rejectedCount = 0;
+    let unsupportedCount = 0;
 
     files.forEach((file) => {
+      if (!isAllowedAttachment(file)) {
+        unsupportedCount += 1;
+        return;
+      }
+
       const nextKey = fileKey(file);
 
       if (existing.has(nextKey)) {
@@ -101,35 +130,37 @@ export function useSearchBarAttachments() {
         size: file.size,
         url: URL.createObjectURL(file),
         isObjectUrl: true,
-      })
-    })
+      });
+    });
 
-    setUploadError(
-      rejectedCount > 0
-        ? `Total upload limit is 8 MB per message. ${rejectedCount} file${
-            rejectedCount === 1 ? "" : "s"
-          } not added.`
-        : ""
-    )
+    setUploadError(buildUploadError(unsupportedCount, rejectedCount));
 
     if (nextImages.length > 0) {
       setImages((prev) => [...prev, ...nextImages]);
     }
-  }
+  };
 
   const onPickImages = (event) => {
-    const files = Array.from(event.target.files || []);
-    const validImages = files.filter((file) => IMAGE_TYPES.includes(file.type));
-    appendFilesWithinLimit(validImages);
+    const files = Array.from(event.target.files || []).filter((file) =>
+      IMAGE_TYPES.includes(file.type)
+    );
+
+    appendFilesWithinLimit(files);
     event.target.value = "";
-  }
+  };
 
   const onPickDocuments = (event) => {
-    const files = Array.from(event.target.files || []);
-    const validDocuments = files.filter((file) => DOCUMENT_TYPES.includes(file.type));
-    appendFilesWithinLimit(validDocuments);
+    const files = Array.from(event.target.files || []).filter((file) =>
+      DOCUMENT_TYPES.includes(file.type)
+    );
+
+    appendFilesWithinLimit(files);
     event.target.value = "";
-  }
+  };
+
+  const onDropFiles = (files) => {
+    appendFilesWithinLimit(files);
+  };
 
   const removeImage = (index) => {
     setUploadError("");
@@ -141,15 +172,15 @@ export function useSearchBarAttachments() {
       }
 
       return prev.filter((_, itemIndex) => itemIndex !== index);
-    })
-  }
+    });
+  };
 
   const clearAttachments = () => {
     revokeImageUrls(images);
     clearPendingImageRefs();
     setImages([]);
     setUploadError("");
-  }
+  };
 
   const buildImagePayload = async () => {
     const payload = await Promise.all(
@@ -167,7 +198,7 @@ export function useSearchBarAttachments() {
             size: image.file.size,
             data: await fileToBase64(image.file),
             previewUrl: image.url || null,
-          }
+          };
         }
 
         if (!image.cacheKey) {
@@ -175,6 +206,7 @@ export function useSearchBarAttachments() {
         }
 
         const data = await getCachedImageData(image.cacheKey);
+
         if (!data) {
           return null;
         }
@@ -186,12 +218,12 @@ export function useSearchBarAttachments() {
           size: image.size || 0,
           data,
           previewUrl: image.url || null,
-        }
+        };
       })
-    )
+    );
 
     return payload.filter(Boolean);
-  }
+  };
 
   const persistPendingImages = (imagePayload) => {
     writePendingImageRefs(
@@ -201,8 +233,8 @@ export function useSearchBarAttachments() {
         mimeType: image.mimeType,
         size: image.size || 0,
       }))
-    )
-  }
+    );
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -214,31 +246,22 @@ export function useSearchBarAttachments() {
         setImages((currentImages) => {
           revokeImageUrls(currentImages);
           return pendingImages;
-        })
+        });
       }
-    }
+    };
 
-    loadPendingImages();
+    void loadPendingImages();
 
     return () => {
       isMounted = false;
-    }
-  }, [])
+    };
+  }, []);
 
   useEffect(() => {
     return () => {
       revokeImageUrls(images);
-    }
+    };
   }, [images]);
 
-  return {
-    images,
-    uploadError,
-    onPickImages,
-    onPickDocuments,
-    removeImage,
-    clearAttachments,
-    buildImagePayload,
-    persistPendingImages,
-  }
+  return { images, uploadError, onPickImages, onPickDocuments, onDropFiles, removeImage, clearAttachments, buildImagePayload, persistPendingImages, imageKey };
 }
