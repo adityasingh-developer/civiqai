@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 import { isValidElement } from "react";
-import ReactMarkdown from "react-markdown";
+import { Streamdown } from "streamdown";
 
 export default function MarkdownMessage({ text }) {
   const renderParagraph = (props) => {
@@ -25,7 +25,8 @@ export default function MarkdownMessage({ text }) {
 
   return (
     <div className="max-w-none text-md leading-relaxed text-stone-800 dark:text-stone-100">
-      <ReactMarkdown
+      <Streamdown
+        className="max-w-none text-md leading-relaxed text-stone-800 dark:text-stone-100"
         components={{
           h1: (props) => (
             <h1
@@ -80,7 +81,7 @@ export default function MarkdownMessage({ text }) {
         }}
       >
         {text}
-      </ReactMarkdown>
+      </Streamdown>
     </div>
   );
 }

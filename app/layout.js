@@ -1,9 +1,10 @@
-import { Hanken_Grotesk } from "next/font/google";
+﻿import { Hanken_Grotesk } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import Navbar from "@/components/Navbar";
 import SessionWrapper from "@/components/SessionWrapper";
 
 import "./globals.css";
+import "streamdown/styles.css";
 import "@/app/external.module.css";
 
 const font = Hanken_Grotesk({

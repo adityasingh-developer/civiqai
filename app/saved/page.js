@@ -1,10 +1,11 @@
-"use client";
+﻿"use client";
 
 import { Copy, Download, X } from "lucide-react";
 import { signIn, useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 
 import LoadingDots from "@/components/LoadingDots";
+import MarkdownMessage from "@/components/MarkdownMessage";
 import MessageAttachments from "@/components/MessageAttachments";
 import CustomTooltip from "@/components/customTooltip";
 import {
@@ -228,11 +229,7 @@ export default function SavedPage() {
                 </div>
                 <div className="mt-4">
                   <MessageAttachments images={message.images} />
-                  {message.text ? (
-                    <p className="whitespace-pre-wrap break-words text-base leading-relaxed text-stone-800 dark:text-stone-100">
-                      {message.text}
-                    </p>
-                  ) : null}
+                  {message.text ? <MarkdownMessage text={message.text} /> : null}
                 </div>
               </article>
             ))}
