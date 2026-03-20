@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { Bookmark, BookmarkCheck, Copy } from "lucide-react";
 import { signIn, useSession } from "next-auth/react";
@@ -211,9 +211,11 @@ export default function ChatPage() {
         body: JSON.stringify({
           message: safeText,
           images,
-          history: messages
-            .filter((message) => !message.loading)
-            .map((message) => ({ role: message.role, content: message.text }))
+          history: history
+            .flatMap((chat) => [
+              { role: "user", content: chat.input },
+              { role: "assistant", content: chat.answer },
+            ])
             .slice(-4),
         }),
       });
@@ -375,3 +377,4 @@ export default function ChatPage() {
     </main>
   );
 }
+

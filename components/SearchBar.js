@@ -17,8 +17,15 @@ import {
 
 const PROMPT_SESSION_KEY = "civiqai_prompt";
 const IMAGE_TYPES = ["image/png", "image/jpeg"];
-const DOCUMENT_TYPES = ["application/pdf", "text/plain"];
-const MAX_TOTAL_UPLOAD_BYTES = 20 * 1024 * 1024;
+const DOCUMENT_TYPES = [
+  "application/pdf",
+  "text/plain",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+];
+const MAX_TOTAL_UPLOAD_BYTES = 8 * 1024 * 1024;
 
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
@@ -163,7 +170,7 @@ export default function SearchBar({ onSend, isSending = false }) {
 
     setUploadError(
       rejectedCount > 0
-        ? `Total upload limit is 20 MB per message. ${rejectedCount} file${rejectedCount === 1 ? "" : "s"} not added.`
+        ? `Total upload limit is 8 MB per message. ${rejectedCount} file${rejectedCount === 1 ? "" : "s"} not added.`
         : ""
     );
 
@@ -451,7 +458,7 @@ export default function SearchBar({ onSend, isSending = false }) {
       <input
         ref={documentInputRef}
         type="file"
-        accept="application/pdf,text/plain,.pdf,.txt"
+        accept="application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.pdf,.txt,.doc,.docx,.xls,.xlsx"
         multiple
         className="hidden"
         onChange={onPickDocuments}

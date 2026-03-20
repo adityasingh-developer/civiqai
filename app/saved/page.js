@@ -1,17 +1,18 @@
 "use client";
 
-import { Copy, X } from "lucide-react";
+import { Copy, Download, X } from "lucide-react";
 import { signIn, useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 
 import LoadingDots from "@/components/LoadingDots";
 import MessageAttachments from "@/components/MessageAttachments";
+import CustomTooltip from "@/components/customTooltip";
 import {
   buildSavedMessagesFromChats,
   removeSavedMessageFromChats,
 } from "@/lib/chatSaved";
 import { readUserCache, writeUserCache } from "@/lib/localCache";
-import CustomTooltip from "@/components/customTooltip";
+import { exportSavedMessagePdf } from "@/lib/pdfExport";
 
 const formatSavedTime = (timestamp) =>
   new Date(timestamp).toLocaleString([], {
@@ -30,6 +31,7 @@ export default function SavedPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [copiedId, setCopiedId] = useState(null);
   const [removingIds, setRemovingIds] = useState(new Set());
+  const [exportingIds, setExportingIds] = useState(new Set());
 
   useEffect(() => {
     if (status !== "authenticated") {
@@ -88,6 +90,22 @@ export default function SavedPage() {
       setTimeout(() => setCopiedId(null), 1200);
     } catch (error) {
       console.error("Copy failed", error);
+    }
+  };
+
+  const handleExportPdf = async (message) => {
+    setExportingIds((prev) => new Set(prev).add(message.id));
+
+    try {
+      await exportSavedMessagePdf(message);
+    } catch (error) {
+      console.error("PDF export failed", error);
+    } finally {
+      setExportingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(message.id);
+        return next;
+      });
     }
   };
 
@@ -173,6 +191,18 @@ export default function SavedPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    <CustomTooltip content="Export PDF">
+                      <button
+                        type="button"
+                        onClick={() => handleExportPdf(message)}
+                        disabled={exportingIds.has(message.id)}
+                        className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-stone-200/80 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-300 disabled:cursor-default disabled:opacity-60 dark:bg-stone-700 dark:text-stone-100 dark:hover:bg-stone-600"
+                      >
+                        <Download className="h-4 w-4" />
+                        {exportingIds.has(message.id) ? "Exporting" : "PDF"}
+                      </button>
+                    </CustomTooltip>
+
                     <CustomTooltip content="Remove">
                       <button
                         type="button"
@@ -181,7 +211,6 @@ export default function SavedPage() {
                         className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-stone-200/80 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-300 disabled:cursor-default disabled:opacity-60 dark:bg-stone-700 dark:text-stone-100 dark:hover:bg-stone-600"
                       >
                         <X className="h-4 w-4" />
-
                       </button>
                     </CustomTooltip>
 
