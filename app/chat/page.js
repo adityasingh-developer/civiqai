@@ -2,7 +2,7 @@
 
 import { Bookmark, BookmarkCheck, Copy } from "lucide-react"
 import { signIn, useSession } from "next-auth/react"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 
 import LoadingDots from "@/components/LoadingDots"
 import MessageAttachments from "@/components/MessageAttachments"
@@ -21,7 +21,6 @@ export default function ChatPage() {
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [copiedId, setCopiedId] = useState(null);
   const [savingIds, setSavingIds] = useState(new Set());
-  const endRef = useRef(null);
 
   useEffect(() => {
     if (status !== "authenticated") {
@@ -75,18 +74,6 @@ export default function ChatPage() {
       isMounted = false;
     };
   }, [status, userEmail])
-
-  useEffect(() => {
-    if (status !== "authenticated") {
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      endRef.current?.scrollIntoView({ behavior: "auto", block: "end" });
-    }, 0)
-
-    return () => clearTimeout(timer);
-  }, [status, messages.length]);
 
   const handleCopy = async (message) => {
     try {
@@ -339,7 +326,6 @@ export default function ChatPage() {
               </button>
             </div>
           )}
-          <div ref={endRef} className="scroll-mb-[120px]" />
         </div>
       </section>
 
@@ -351,4 +337,3 @@ export default function ChatPage() {
     </main>
   );
 }
-
