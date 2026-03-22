@@ -17,6 +17,7 @@ function wait(ms) {
 
 export default function ChatPage() {
   const { data: session, status } = useSession();
+  const isSessionLoading = status === "loading";
   const isSignedIn = Boolean(session?.user);
   const userEmail = session?.user?.email || "";
   const [history, setHistory] = useState([]);
@@ -28,6 +29,11 @@ export default function ChatPage() {
   const shouldAutoScrollRef = useRef(true);
 
   useEffect(() => {
+    if (status === "loading") {
+      setIsLoadingHistory(true);
+      return;
+    }
+
     if (status !== "authenticated") {
       setHistory([]);
       setMessages([]);
@@ -289,7 +295,11 @@ export default function ChatPage() {
   return (
     <main className="flex min-h-screen flex-col bg-stone-300 text-stone-900 transition-colors duration-300 dark:bg-stone-900 dark:text-stone-200">
       <section className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 px-4 pb-8 pt-24 sm:px-6 sm:pt-28">
-        {isSignedIn ? (
+        {isSessionLoading ? (
+          <div className="flex justify-center py-10">
+            <LoadingDots className="text-stone-800 dark:text-stone-100" />
+          </div>
+        ) : isSignedIn ? (
           isLoadingHistory ? (
             <div className="flex justify-center py-10">
               <LoadingDots className="text-stone-800 dark:text-stone-100" />
