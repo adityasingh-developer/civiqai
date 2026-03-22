@@ -9,7 +9,7 @@ import { Trash2 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { signIn, signOut, useSession } from "next-auth/react"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 const Navbar = ({ userImageUrl = "", userName = "User" }) => {
   const pathname = usePathname();
@@ -18,6 +18,8 @@ const Navbar = ({ userImageUrl = "", userName = "User" }) => {
   const email = session?.user?.email || "";
   const [hasHistory, setHasHistory] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef(null);
   const displayName = session?.user?.name || email || userName;
   const imageUrl = session?.user?.image || userImageUrl;
   const initial = displayName?.slice(0, 1)?.toUpperCase() || "U";
@@ -30,6 +32,31 @@ const Navbar = ({ userImageUrl = "", userName = "User" }) => {
     return () => window.removeEventListener("user-cache-updated", sync);
   }, [email]);
 
+  useEffect(() => {
+    if (!isMenuOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setIsMenuOpen(false);
+      }
+    };
+
+    const handleEscape = (event) => {
+      if (event.key === "Escape") {
+        setIsMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [isMenuOpen]);
+
   const handleDeleteHistory = async () => {
     if (!email) return;
 
@@ -38,6 +65,7 @@ const Navbar = ({ userImageUrl = "", userName = "User" }) => {
       if (!res.ok) throw new Error("Failed to delete history");
       writeUserCache("chat-cache", email, []);
       setConfirmOpen(false);
+      setIsMenuOpen(false);
       window.location.reload();
     } catch (error) {
       console.error("Failed to delete history", error);
@@ -48,8 +76,8 @@ const Navbar = ({ userImageUrl = "", userName = "User" }) => {
     <>
       <nav className="fixed inset-x-0 top-0 z-100000">
         <div className="grid grid-cols-[1fr_auto_1fr] items-start">
-          <span className="h-1.25 rounded-bl-[100%_20%] bg-stone-800 shadow-[0_0_10px_0.4rem_#D6d3d1] duration-300 dark:h-0.75 dark:bg-stone-400 dark:shadow-[0_0_10px_0.4rem_#1c1917]" />
-          <div className="relative h-12 w-[min(620px,92vw)] rounded-b-4xl bg-stone-800 text-white shadow-[0_0_10px_0.4rem_#D6d3d1] duration-300 before:absolute before:-left-7.75 before:top-0 before:z-10 before:h-8 before:w-8 before:bg-[radial-gradient(circle_at_0%_100%,transparent_32px,#292524_32px)] before:content-[''] before:duration-300 dark:bg-stone-400 dark:text-[#1e1a17] dark:shadow-[0_0_10px_0.4rem_#1c1917] dark:before:-top-px dark:before:bg-[radial-gradient(circle_at_0%_100%,transparent_32px,#a6a09b_32px)] after:absolute after:-right-7.75 after:top-0 after:h-8 after:w-8 after:bg-[radial-gradient(circle_at_100%_100%,transparent_32px,#292524_32px)] after:content-[''] after:duration-300 dark:after:-top-px dark:after:bg-[radial-gradient(circle_at_100%_100%,transparent_32px,#a6a09b_32px)] sm:h-13 sm:w-[min(620px,70vw)]">
+          <span className="h-1.25 rounded-bl-[100%_20%] bg-stone-800 shadow-[0_0_10px_0.4rem_#D6d3d1] transition-colors duration-300 dark:h-0.75 dark:bg-[#272320] dark:shadow-[0_0_10px_0.4rem_#1c1917]" />
+          <div className="relative h-12 w-[min(620px,92vw)] rounded-b-4xl bg-stone-800 text-white shadow-[0_0_10px_0.4rem_#D6d3d1] transition-colors duration-300 before:absolute before:-left-7.75 before:top-0 before:z-10 before:h-8 before:w-8 before:bg-[radial-gradient(circle_at_0%_100%,transparent_32px,#292524_32px)] before:content-[''] before:transition-colors before:duration-300 after:absolute after:-right-7.75 after:top-0 after:h-8 after:w-8 after:bg-[radial-gradient(circle_at_100%_100%,transparent_32px,#292524_32px)] after:content-[''] after:transition-colors after:duration-300 dark:bg-[#272320] dark:text-stone-100 dark:shadow-[0_0_10px_0.4rem_#1c1917] dark:before:-top-px dark:before:bg-[radial-gradient(circle_at_0%_100%,transparent_32px,#272320_32px)] dark:after:-top-px dark:after:bg-[radial-gradient(circle_at_100%_100%,transparent_32px,#272320_32px)] sm:h-13 sm:w-[min(620px,70vw)]">
             <div className="grid h-full grid-cols-[1fr_auto_1fr] items-center px-3 sm:px-6">
               <div className="justify-self-start">{pageTitle ? <h1 className="text-sm font-bold sm:text-xl">{pageTitle}</h1> : ""}</div>
               <div className="justify-self-center"><Link href="/"><Logo className="h-8 w-8 sm:h-10 sm:w-10" /></Link></div>
@@ -57,23 +85,28 @@ const Navbar = ({ userImageUrl = "", userName = "User" }) => {
                 <div className="flex items-center gap-2 sm:gap-3">
                   <ThemeToggle />
                   {session?.user ? (
-                    <div className="relative">
-                      <input id="profile-menu-toggle" type="checkbox" className="peer sr-only" />
-                      <label htmlFor="profile-menu-toggle" className="inline-flex h-8 w-8 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-white/20 font-semibold text-white sm:h-10 sm:w-10" aria-label="Toggle profile menu">
+                    <div ref={menuRef} className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setIsMenuOpen((prev) => !prev)}
+                        className="inline-flex h-8 w-8 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-white/20 font-semibold text-white sm:h-10 sm:w-10"
+                        aria-label="Toggle profile menu"
+                        aria-expanded={isMenuOpen}
+                      >
                         {imageUrl ? <img src={imageUrl} alt={`${displayName} profile`} className="h-full w-full object-cover" /> : initial}
-                      </label>
-                      <div className="pointer-events-none absolute right-0 top-full mt-2 min-w-56 -translate-y-1.5 rounded-2xl bg-stone-100 p-4 text-stone-800 opacity-0 shadow-2xl transition-[opacity,transform] duration-300 ease-out peer-checked:pointer-events-auto peer-checked:translate-y-0 peer-checked:opacity-100 dark:bg-stone-800 dark:text-stone-100 sm:min-w-[18rem]">
+                      </button>
+                      <div className={`absolute right-0 top-full mt-2 min-w-56 rounded-2xl bg-stone-100 p-4 text-stone-800 shadow-2xl transition-[opacity,transform] duration-300 ease-out dark:bg-stone-800 dark:text-stone-100 sm:min-w-[18rem] ${isMenuOpen ? "pointer-events-auto translate-y-0 opacity-100" : "pointer-events-none -translate-y-1.5 opacity-0"}`}>
                         <div className="flex items-center justify-between gap-3">
                           <h1 className="text-lg font-semibold text-stone-800 dark:text-stone-100 sm:text-xl">{displayName}</h1>
-                          <label htmlFor="profile-menu-toggle" className="inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-full bg-stone-200/80 text-sm font-semibold text-stone-700 hover:bg-stone-200 dark:bg-stone-700 dark:text-stone-100 dark:hover:bg-stone-600 sm:text-md" aria-label="Close profile menu">x</label>
+                          <button type="button" onClick={() => setIsMenuOpen(false)} className="inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-full bg-stone-200/80 text-sm font-semibold text-stone-700 hover:bg-stone-200 dark:bg-stone-700 dark:text-stone-100 dark:hover:bg-stone-600 sm:text-md" aria-label="Close profile menu">x</button>
                         </div>
                         <ul className="mt-3 flex flex-col gap-2 text-base text-stone-800 dark:text-stone-100 sm:text-lg">
                           <li className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 hover:bg-stone-200 dark:hover:bg-stone-700">
-                            <Link href="/chat" className="flex-1">History</Link>
+                            <Link href="/chat" className="flex-1" onClick={() => setIsMenuOpen(false)}>History</Link>
                             {hasHistory ? <CustomTooltip content="Delete history"><button type="button" onClick={() => setConfirmOpen(true)} className="inline-flex cursor-pointer items-center justify-center rounded-full p-1 text-stone-600 transition hover:bg-stone-300 dark:text-stone-200 dark:hover:bg-stone-600" aria-label="Delete history"><Trash2 className="h-4 w-4" /></button></CustomTooltip> : null}
                           </li>
-                          <li><Link href="/saved" className="block rounded-lg px-3 py-2 hover:bg-stone-200 dark:hover:bg-stone-700">Saved messages</Link></li>
-                          <li><button type="button" onClick={() => signOut()} className="w-full cursor-pointer rounded-lg px-3 py-2 text-left hover:bg-stone-200/70 dark:hover:bg-stone-700">Sign out</button></li>
+                          <li><Link href="/saved" className="block rounded-lg px-3 py-2 hover:bg-stone-200 dark:hover:bg-stone-700" onClick={() => setIsMenuOpen(false)}>Saved messages</Link></li>
+                          <li><button type="button" onClick={() => { setIsMenuOpen(false); signOut(); }} className="w-full cursor-pointer rounded-lg px-3 py-2 text-left hover:bg-stone-200/70 dark:hover:bg-stone-700">Sign out</button></li>
                         </ul>
                       </div>
                     </div>
@@ -84,7 +117,7 @@ const Navbar = ({ userImageUrl = "", userName = "User" }) => {
               </div>
             </div>
           </div>
-          <span className="h-1.25 rounded-br-[100%_20%] bg-stone-800 shadow-[0_0_10px_0.4rem_#D6d3d1] duration-300 dark:h-0.75 dark:bg-stone-400 dark:shadow-[0_0_10px_0.4rem_#1c1917]" />
+          <span className="h-1.25 rounded-br-[100%_20%] bg-stone-800 shadow-[0_0_10px_0.4rem_#D6d3d1] transition-colors duration-300 dark:h-0.75 dark:bg-[#272320] dark:shadow-[0_0_10px_0.4rem_#1c1917]" />
         </div>
       </nav>
       {confirmOpen ? (

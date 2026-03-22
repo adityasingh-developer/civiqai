@@ -129,9 +129,9 @@ export default function SearchBar({ onSend, isSending = false }) {
     <div className="relative flex w-full flex-col gap-3">
       <AttachmentPreviewList images={images} onRemove={removeImage} imageKey={imageKey}/>
 
-      <div className="w-full bg-stone-300 px-3 pb-1 pt-0.5 dark:bg-stone-900">
+      <div className="w-full bg-stone-300 px-3 pb-1 pt-0.5 transition-colors duration-300 dark:bg-stone-900">
         <div className="mx-auto flex w-full max-w-3xl flex-col">
-          <div ref={dropZoneRef} className={`relative flex h-auto min-h-28 max-h-70 w-full flex-col gap-2 overflow-visible rounded-4xl bg-[#bdb9b7] pb-2 pt-3.5 transition dark:bg-[#272320] sm:min-h-30 ${
+          <div ref={dropZoneRef} className={`relative flex h-auto min-h-28 max-h-70 w-full flex-col gap-2 overflow-visible rounded-4xl bg-[#bdb9b7] pb-2 pt-3.5 transition-colors duration-300 dark:bg-[#272320] sm:min-h-30 ${
               isDragActive
                 ? "ring-2 ring-stone-800/40 dark:ring-stone-100/40"
                 : ""
