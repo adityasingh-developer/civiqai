@@ -26,7 +26,12 @@ const ChatSchema = new mongoose.Schema(
 
 const UserSchema = new mongoose.Schema(
   {
-    email: { type: String, required: true, unique: true, index: true },
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      index: true
+    },
     name: { type: String },
     image: { type: String },
     provider: { type: String },
