@@ -2,7 +2,7 @@
 
 import { Bookmark, BookmarkCheck, Copy } from "lucide-react"
 import { signIn, useSession } from "next-auth/react"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import LoadingDots from "@/components/LoadingDots"
 import MarkdownMessage from "@/components/MarkdownMessage"
@@ -11,19 +11,8 @@ import SearchBar from "@/components/SearchBar"
 import { buildChatMessages, formatChatTime, toggleSavedState, writeChatCaches } from "@/lib/chatPage";
 import { readUserCache } from "@/lib/localCache";
 
-function parseStreamLines(buffer, onEvent) {
-  const lines = buffer.split("\n");
-  const pending = lines.pop() || "";
-
-  lines.forEach((line) => {
-    if (!line.trim()) {
-      return;
-    }
-
-    onEvent(JSON.parse(line));
-  });
-
-  return pending;
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export default function ChatPage() {
@@ -36,6 +25,7 @@ export default function ChatPage() {
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [copiedId, setCopiedId] = useState(null);
   const [savingIds, setSavingIds] = useState(new Set());
+  const shouldAutoScrollRef = useRef(true);
 
   useEffect(() => {
     if (status !== "authenticated") {
@@ -90,6 +80,22 @@ export default function ChatPage() {
   }, [status, userEmail])
 
   useEffect(() => {
+    const updateAutoScroll = () => {
+      const distanceFromBottom =
+        document.documentElement.scrollHeight - window.innerHeight - window.scrollY;
+      shouldAutoScrollRef.current = distanceFromBottom < 160;
+    };
+
+    updateAutoScroll();
+    window.addEventListener("scroll", updateAutoScroll, { passive: true });
+    return () => window.removeEventListener("scroll", updateAutoScroll);
+  }, []);
+
+  useEffect(() => {
+    if (!shouldAutoScrollRef.current) {
+      return;
+    }
+
     window.scrollTo({
       top: document.documentElement.scrollHeight,
       behavior: "smooth",
@@ -163,6 +169,7 @@ export default function ChatPage() {
 
   const handleSend = async ({ text = "", images = [] }) => {
     setIsSending(true);
+    shouldAutoScrollRef.current = true;
     const userTimestamp = Date.now();
     const userTime = formatChatTime(userTimestamp);
     const safeText = text.slice(0, 4000);
@@ -171,8 +178,6 @@ export default function ChatPage() {
     const tempChatId = `temp-${Date.now()}`;
     const tempUserId = `u-${tempChatId}`;
     const tempAssistantId = `a-${tempChatId}`;
-    let streamedAnswer = "";
-    let finalChat = null;
 
     setMessages((prev) => [
       ...prev,
@@ -217,105 +222,41 @@ export default function ChatPage() {
         }),
       });
 
+      const data = await res.json();
+
       if (!res.ok) {
-        const data = await res.json();
         throw new Error(data?.error || "Sorry, something went wrong.");
       }
 
-      if (!res.body) {
-        throw new Error("Streaming response not available.");
-      }
+      const chat = data.chat;
+      const finalAnswer = data.answer || "Sorry, something went wrong.";
 
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let pendingText = "";
-      let flushTimer = null;
-
-      const updateAssistant = (text, loading) => {
+      for (let index = 3; index <= finalAnswer.length + 3; index += 3) {
+        const partial = finalAnswer.slice(0, index);
+        const edgeChar = partial.slice(-1);
         setMessages((prev) =>
           prev.map((message) =>
             message.id === tempAssistantId
-              ? { ...message, text, loading }
+              ? { ...message, text: partial, loading: false }
               : message
           )
         );
-      };
-
-      const flushPending = () => {
-        streamedAnswer += pendingText.slice(0, 3);
-        pendingText = pendingText.slice(3);
-        updateAssistant(streamedAnswer, false);
-        flushTimer = pendingText ? window.setTimeout(flushPending, 16) : null;
-      };
-
-      const queueChunk = (text) => {
-        pendingText += text;
-        if (!flushTimer) {
-          flushPending();
+        if (index < finalAnswer.length) {
+          await wait(/[.,!?\\s]/.test(edgeChar) ? 10 : 18);
         }
-      };
-
-      while (true) {
-        const { done, value } = await reader.read();
-
-        if (done) {
-          break;
-        }
-
-        buffer += decoder.decode(value, { stream: true });
-        buffer = parseStreamLines(buffer, (event) => {
-          if (event.type === "chunk") {
-            queueChunk(event.text || "");
-            return;
-          }
-
-          if (event.type === "done") {
-            streamedAnswer = event.answer || streamedAnswer;
-            finalChat = event.chat;
-            return;
-          }
-
-          if (event.type === "error") {
-            throw new Error(event.error || "Sorry, something went wrong.");
-          }
-        });
       }
-
-      while (flushTimer || pendingText) {
-        await new Promise((resolve) => setTimeout(resolve, 16));
-      }
-
-      buffer += decoder.decode();
-      parseStreamLines(buffer, (event) => {
-        if (event.type === "done") {
-          streamedAnswer = event.answer || streamedAnswer;
-          finalChat = event.chat;
-          return;
-        }
-
-        if (event.type === "error") {
-          throw new Error(event.error || "Sorry, something went wrong.");
-        }
-      });
-
-      if (!finalChat) {
-        throw new Error("Incomplete streaming response.");
-      }
-
-      updateAssistant(streamedAnswer, false);
 
       const nextHistoryItem = {
-        id: finalChat.id,
-        input: finalChat.input,
-        promptImages: Array.isArray(finalChat.promptImages) ? finalChat.promptImages : [],
-        answer: streamedAnswer,
-        userTime: finalChat.userTime,
-        assistantTime: finalChat.assistantTime,
-        savedUser: Boolean(finalChat.savedUser),
-        savedAssistant: Boolean(finalChat.savedAssistant),
-        savedUserAt: finalChat.savedUserAt,
-        savedAssistantAt: finalChat.savedAssistantAt,
+        id: chat.id,
+        input: chat.input,
+        promptImages: Array.isArray(chat.promptImages) ? chat.promptImages : [],
+        answer: finalAnswer,
+        userTime: chat.userTime,
+        assistantTime: chat.assistantTime,
+        savedUser: Boolean(chat.savedUser),
+        savedAssistant: Boolean(chat.savedAssistant),
+        savedUserAt: chat.savedUserAt,
+        savedAssistantAt: chat.savedAssistantAt,
       };
 
       setHistory((prev) => {
@@ -335,11 +276,7 @@ export default function ChatPage() {
       setMessages((prev) =>
         prev.map((message) =>
           message.id === tempAssistantId
-            ? {
-                ...message,
-                text: streamedAnswer || error.message || "Sorry, something went wrong.",
-                loading: false,
-              }
+            ? { ...message, text: error.message || "Sorry, something went wrong.", loading: false }
             : message
         )
       );

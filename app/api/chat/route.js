@@ -75,10 +75,6 @@ function buildGeminiParts(message, images) {
   return parts;
 }
 
-function toStreamEvent(payload) {
-  return `${JSON.stringify(payload)}\n`;
-}
-
 export async function POST(req) {
   try {
     const session = await getRequiredSession(req);
@@ -153,91 +149,42 @@ export async function POST(req) {
       generationConfig: { temperature: 0.4, maxOutputTokens: 900 },
     });
 
-    const streamResult = await chatSession.sendMessageStream(
+    const result = await chatSession.sendMessage(
       buildGeminiParts(finalMessage, images)
     );
-    const encoder = new TextEncoder();
+    const answer = result.response.text().trim() || "Sorry, something went wrong.";
 
-    const stream = new ReadableStream({
-      async start(controller) {
-        let answer = "";
+    const userTime = new Date();
+    const assistantTime = new Date();
 
-        try {
-          for await (const chunk of streamResult.stream) {
-            const text = chunk.text();
-
-            if (!text) {
-              continue;
-            }
-
-            answer += text;
-            controller.enqueue(
-              encoder.encode(toStreamEvent({ type: "chunk", text }))
-            );
-          }
-
-          answer = answer.trim() || "Sorry, something went wrong.";
-
-          const userTime = new Date();
-          const assistantTime = new Date();
-
-          user.chatHistory.push({
-            promptEnc: encryptJson(userInput),
-            answerEnc: encryptJson(answer),
-            promptImages,
-            userTime,
-            assistantTime,
-            savedUser: false,
-            savedAssistant: false,
-            savedUserAt: null,
-            savedAssistantAt: null,
-          });
-          await user.save();
-
-          const savedChat = user.chatHistory[user.chatHistory.length - 1];
-
-          controller.enqueue(
-            encoder.encode(
-              toStreamEvent({
-                type: "done",
-                answer,
-                chat: {
-                  id: String(savedChat._id),
-                  input: userInput,
-                  promptImages,
-                  answer,
-                  userTime,
-                  assistantTime,
-                  savedUser: false,
-                  savedAssistant: false,
-                  savedUserAt: null,
-                  savedAssistantAt: null,
-                },
-              })
-            )
-          );
-        } catch (error) {
-          console.error("Gemini stream error:", error);
-          controller.enqueue(
-            encoder.encode(
-              toStreamEvent({
-                type: "error",
-                error: isDbUnavailableError(error)
-                  ? "Database connection failed. Check MongoDB Atlas or your network/DNS."
-                  : "Server error",
-              })
-            )
-          );
-        } finally {
-          controller.close();
-        }
-      },
+    user.chatHistory.push({
+      promptEnc: encryptJson(userInput),
+      answerEnc: encryptJson(answer),
+      promptImages,
+      userTime,
+      assistantTime,
+      savedUser: false,
+      savedAssistant: false,
+      savedUserAt: null,
+      savedAssistantAt: null,
     });
+    await user.save();
 
-    return new Response(stream, {
-      headers: {
-        "Content-Type": "application/x-ndjson; charset=utf-8",
-        "Cache-Control": "no-cache, no-transform",
+    const savedChat = user.chatHistory[user.chatHistory.length - 1];
+
+    return Response.json({
+      answer,
+      chat: {
+        id: String(savedChat._id),
+        input: userInput,
+        promptImages,
+        answer,
+        userTime,
+        assistantTime,
+        savedUser: false,
+        savedAssistant: false,
+        savedUserAt: null,
+        savedAssistantAt: null,
       },
     });
   } catch (error) {
