@@ -2,7 +2,7 @@
 
 import { Bookmark, BookmarkCheck, Copy } from "lucide-react"
 import { signIn, useSession } from "next-auth/react"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 
 import LoadingDots from "@/components/LoadingDots"
 import MessageAttachments from "@/components/MessageAttachments"
@@ -15,7 +15,6 @@ export default function ChatPage() {
   const { data: session, status } = useSession();
   const isSignedIn = Boolean(session?.user);
   const userEmail = session?.user?.email || "";
-  const endRef = useRef(null);
   const [history, setHistory] = useState([]);
   const [messages, setMessages] = useState([]);
   const [isSending, setIsSending] = useState(false);
@@ -77,7 +76,10 @@ export default function ChatPage() {
   }, [status, userEmail])
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    window.scrollTo({
+      top: document.documentElement.scrollHeight,
+      behavior: "smooth",
+    });
   }, [messages, isLoadingHistory]);
 
   const handleCopy = async (message) => {
@@ -258,7 +260,7 @@ export default function ChatPage() {
 
   return (
     <main className="flex min-h-screen flex-col bg-stone-300 text-stone-900 transition-colors duration-300 dark:bg-stone-900 dark:text-stone-200">
-      <section className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 px-4 pt-24 sm:px-6 sm:pt-28">
+      <section className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 px-4 pb-8 pt-24 sm:px-6 sm:pt-28">
           {isSignedIn ? (
             isLoadingHistory ? (
               <div className="flex justify-center py-10">
@@ -330,7 +332,6 @@ export default function ChatPage() {
               </button>
             </div>
           )}
-        <div ref={endRef} />
       </section>
 
       {isSignedIn && (
