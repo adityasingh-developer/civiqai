@@ -38,6 +38,26 @@ function isDbUnavailableError(error) {
   )
 }
 
+async function withRetries(run, attempts = 3, delayMs = 1200) {
+  let lastError;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await run();
+    } catch (error) {
+      lastError = error;
+
+      if (attempt === attempts) {
+        break;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+
+  throw lastError;
+}
+
 function buildGeminiHistory(history) {
   return history.flatMap((message) => {
     const text = `${message?.content || message?.text || ""}`.trim();
@@ -58,7 +78,7 @@ function buildGeminiHistory(history) {
 async function waitForFileActive(fileManager, file) {
   let nextFile = file;
 
-  for (let attempt = 0; attempt < 20; attempt += 1) {
+  for (let attempt = 0; attempt < 25; attempt += 1) {
     if (nextFile.state === FileState.ACTIVE) {
       return nextFile;
     }
@@ -68,7 +88,7 @@ async function waitForFileActive(fileManager, file) {
     }
 
     await new Promise((resolve) => setTimeout(resolve, 1500));
-    nextFile = await fileManager.getFile(nextFile.name);
+    nextFile = await withRetries(() => fileManager.getFile(nextFile.name), 2, 800);
   }
 
   throw new Error("Attachment processing timed out.");
@@ -76,6 +96,7 @@ async function waitForFileActive(fileManager, file) {
 
 async function buildGeminiParts(message, images, fileManager) {
   const parts = [];
+  const uploadedFiles = [];
 
   if (message) {
     parts.push({ text: message });
@@ -86,11 +107,27 @@ async function buildGeminiParts(message, images, fileManager) {
       continue;
     }
 
-    const upload = await fileManager.uploadFile(image.buffer, {
-      mimeType: image.mimeType,
-      displayName: image.name || "attachment",
-    });
+    if (image.mimeType.startsWith("image/")) {
+      parts.push({
+        inlineData: {
+          data: image.buffer.toString("base64"),
+          mimeType: image.mimeType,
+        },
+      });
+      continue;
+    }
+
+    const upload = await withRetries(
+      () =>
+        fileManager.uploadFile(image.buffer, {
+          mimeType: image.mimeType,
+          displayName: image.name || "attachment",
+        }),
+      2,
+      1000
+    );
     const readyFile = await waitForFileActive(fileManager, upload.file);
+    uploadedFiles.push(readyFile.name);
 
     parts.push({
       fileData: {
@@ -100,7 +137,7 @@ async function buildGeminiParts(message, images, fileManager) {
     })
   }
 
-  return parts;
+  return { parts, uploadedFiles };
 }
 
 export async function POST(req) {
@@ -137,9 +174,8 @@ export async function POST(req) {
           }
         });
 
-      history = Array.isArray(JSON.parse(`${rawHistory || "[]"}`))
-        ? JSON.parse(`${rawHistory || "[]"}`)
-        : [];
+      const parsedHistory = JSON.parse(`${rawHistory || "[]"}`);
+      history = Array.isArray(parsedHistory) ? parsedHistory : [];
       message = formData.get("message");
       images = await Promise.all(
         attachmentFiles.map(async (file, index) => {
@@ -214,9 +250,8 @@ export async function POST(req) {
       generationConfig: { temperature: 0.4, maxOutputTokens: 900 },
     });
 
-    const result = await chatSession.sendMessage(
-      await buildGeminiParts(finalMessage, images, fileManager)
-    );
+    const { parts, uploadedFiles } = await buildGeminiParts(finalMessage, images, fileManager);
+    const result = await withRetries(() => chatSession.sendMessage(parts), 2, 1000);
     const answer = result.response.text().trim() || "Sorry, something went wrong.";
 
     const userTime = new Date();
@@ -236,6 +271,10 @@ export async function POST(req) {
     await user.save();
 
     const savedChat = user.chatHistory[user.chatHistory.length - 1];
+
+    await Promise.allSettled(
+      uploadedFiles.map((fileName) => fileManager.deleteFile(fileName))
+    );
 
     return Response.json({
       answer,
@@ -262,6 +301,6 @@ export async function POST(req) {
       );
     }
 
-    return Response.json({ error: "Server error" }, { status: 500 });
+    return Response.json({ error: error?.message || "Server error" }, { status: 500 });
   }
 }
