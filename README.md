@@ -18,6 +18,8 @@ The backend is powered by Gemini 2.5 Flash. A specialized system prompt is appli
 ### Data Security
 Privacy is managed through an encryption layer utilizing AES-256-GCM. Every user prompt and AI response is encrypted with a unique 12-byte initialization vector (IV) and an authentication tag before being stored in the database. This ensures that raw chat data is never stored in plain text.
 
+* **AI Assistance:** Developed with support from Google Gemini (AI orchestration) and ChatGPT (Code optimization).
+
 ### Persistence and Auth
 * Framework: Next.js (App Router)
 * Authentication: NextAuth.js with Google Provider
