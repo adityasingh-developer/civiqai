@@ -17,7 +17,7 @@ export default function Home() {
         </div>
       </section>
 
-      <div className="fixed bottom-6 left-1/2 w-full -translate-x-1/2 px-6">
+      <div className="fixed bottom-0 left-1/2 w-full -translate-x-1/2 px-6">
         <SearchBar />
       </div>
     </main>
