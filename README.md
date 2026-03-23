@@ -1,36 +1,38 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# CiviqAI
 
-## Getting Started
+CiviqAI is a secure, AI-powered platform designed to simplify complex government schemes, policies, and legal documents for citizens. By leveraging the Gemini 2.5 Flash model and a robust full-stack architecture, it transforms dense bureaucratic text into clear, actionable summaries.
 
-First, run the development server:
+## Core Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+* **Intelligent Policy Analysis:** Dense documents and PDFs are analyzed to provide instant answers regarding eligibility and application procedures.
+* **Multimodal Input:** Support for both text documents and image-based notices is integrated, allowing users to upload photos of physical posters or announcements.
+* **Secure Persistence:** User interactions are stored in MongoDB, providing persistent chat history and the ability to save specific messages.
+* **Professional Export:** Saved information can be exported as formatted PDF documents for offline reference.
+* **Privacy-First Architecture:** Sensitive data is protected using industry-standard encryption protocols.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Technical Architecture
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+### AI Orchestration
+The backend is powered by Gemini 2.5 Flash. A specialized system prompt is applied to ensure the model remains focused on public policy and provides simplified, accurate explanations. Context management is handled to include prior conversation history and uploaded attachments in every query.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Data Security
+Privacy is managed through an encryption layer utilizing AES-256-GCM. Every user prompt and AI response is encrypted with a unique 12-byte initialization vector (IV) and an authentication tag before being stored in the database. This ensures that raw chat data is never stored in plain text.
 
-## Learn More
+### Persistence and Auth
+* Framework: Next.js (App Router)
+* Authentication: NextAuth.js with Google Provider
+* Database: MongoDB with Mongoose schemas
+* Styling: Tailwind CSS with support for dark and light modes
 
-To learn more about Next.js, take a look at the following resources:
+## Environment Variables
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+To run this project locally, the following environment variables are required:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```text
+GOOGLE_API_KEY=
+MONGODB_URI=
+NEXTAUTH_SECRET=
+NEXTAUTH_URL=
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+ENCRYPTION_KEY=
