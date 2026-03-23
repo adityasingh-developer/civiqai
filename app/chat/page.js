@@ -213,19 +213,40 @@ export default function ChatPage() {
     ]);
 
     try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: safeText,
-          images,
-          history: history
+      const formData = new FormData();
+      formData.append("message", safeText);
+      formData.append(
+        "history",
+        JSON.stringify(
+          history
             .flatMap((chat) => [
               { role: "user", content: chat.input },
               { role: "assistant", content: chat.answer },
             ])
-            .slice(-4),
-        }),
+            .slice(-4)
+        )
+      );
+
+      images.forEach((image) => {
+        if (!image.blob) {
+          return;
+        }
+
+        formData.append("attachments", image.blob, image.name);
+        formData.append(
+          "attachmentMeta",
+          JSON.stringify({
+            cacheKey: image.cacheKey,
+            name: image.name,
+            mimeType: image.mimeType,
+            size: image.size,
+          })
+        );
+      });
+
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        body: formData,
       });
 
       const data = await res.json();

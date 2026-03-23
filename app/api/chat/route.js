@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { FileState, GoogleAIFileManager } from "@google/generative-ai/server";
 // import Groq from "groq-sdk";
 
 import { decryptJson, encryptJson } from "@/lib/crypto"
@@ -54,25 +55,50 @@ function buildGeminiHistory(history) {
   })
 }
 
-function buildGeminiParts(message, images) {
+async function waitForFileActive(fileManager, file) {
+  let nextFile = file;
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    if (nextFile.state === FileState.ACTIVE) {
+      return nextFile;
+    }
+
+    if (nextFile.state === FileState.FAILED) {
+      throw new Error("Attachment processing failed.");
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    nextFile = await fileManager.getFile(nextFile.name);
+  }
+
+  throw new Error("Attachment processing timed out.");
+}
+
+async function buildGeminiParts(message, images, fileManager) {
   const parts = [];
 
   if (message) {
     parts.push({ text: message });
   }
 
-  images.forEach((image) => {
-    if (!image?.data || !image?.mimeType) {
-      return;
+  for (const image of images) {
+    if (!image?.buffer || !image?.mimeType) {
+      continue;
     }
 
+    const upload = await fileManager.uploadFile(image.buffer, {
+      mimeType: image.mimeType,
+      displayName: image.name || "attachment",
+    });
+    const readyFile = await waitForFileActive(fileManager, upload.file);
+
     parts.push({
-      inlineData: {
-        data: image.data,
-        mimeType: image.mimeType,
+      fileData: {
+        mimeType: readyFile.mimeType,
+        fileUri: readyFile.uri,
       },
     })
-  })
+  }
 
   return parts;
 }
@@ -92,15 +118,51 @@ export async function POST(req) {
       );
     }
 
-    const body = await req.json();
-    const history = Array.isArray(body?.history) ? body.history : [];
-    const images = Array.isArray(body?.images) ? body.images : [];
-    const message =
-      body?.message ??
-      body?.prompt ??
-      (Array.isArray(body?.messages)
-        ? body.messages[body.messages.length - 1]?.content
-        : undefined);
+    const contentType = req.headers.get("content-type") || "";
+    let history = [];
+    let images = [];
+    let message;
+
+    if (contentType.includes("multipart/form-data")) {
+      const formData = await req.formData();
+      const rawHistory = formData.get("history");
+      const attachmentFiles = formData.getAll("attachments");
+      const attachmentMeta = formData
+        .getAll("attachmentMeta")
+        .map((item) => {
+          try {
+            return JSON.parse(`${item || "{}"}`);
+          } catch {
+            return {};
+          }
+        });
+
+      history = Array.isArray(JSON.parse(`${rawHistory || "[]"}`))
+        ? JSON.parse(`${rawHistory || "[]"}`)
+        : [];
+      message = formData.get("message");
+      images = await Promise.all(
+        attachmentFiles.map(async (file, index) => {
+          const meta = attachmentMeta[index] || {};
+          return {
+            cacheKey: meta.cacheKey || "",
+            name: meta.name || file.name || `attachment-${index + 1}`,
+            mimeType: meta.mimeType || file.type || "application/octet-stream",
+            size: meta.size || file.size || 0,
+            buffer: Buffer.from(await file.arrayBuffer()),
+          };
+        })
+      );
+    } else {
+      const body = await req.json();
+      history = Array.isArray(body?.history) ? body.history : [];
+      message =
+        body?.message ??
+        body?.prompt ??
+        (Array.isArray(body?.messages)
+          ? body.messages[body.messages.length - 1]?.content
+          : undefined);
+    }
 
     const userInput =
       typeof message === "string" && message.trim().length > 0
@@ -141,6 +203,7 @@ export async function POST(req) {
         ]);
 
     const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY);
+    const fileManager = new GoogleAIFileManager(process.env.GOOGLE_AI_API_KEY);
     const model = genAI.getGenerativeModel({
       model: GOOGLE_MODEL,
       systemInstruction: SYSTEM_PROMPT,
@@ -152,7 +215,7 @@ export async function POST(req) {
     });
 
     const result = await chatSession.sendMessage(
-      buildGeminiParts(finalMessage, images)
+      await buildGeminiParts(finalMessage, images, fileManager)
     );
     const answer = result.response.text().trim() || "Sorry, something went wrong.";
 

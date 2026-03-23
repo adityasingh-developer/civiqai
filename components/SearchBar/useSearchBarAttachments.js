@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { cacheImageFile, clearPendingImageRefs, getCachedImageBlob, getCachedImageData, readPendingImageRefs, writePendingImageRefs } from "@/lib/browserImageCache";
+import { cacheImageFile, clearPendingImageRefs, getCachedImageBlob, readPendingImageRefs, writePendingImageRefs } from "@/lib/browserImageCache";
 
 import { DOCUMENT_TYPES, IMAGE_TYPES, MAX_TOTAL_UPLOAD_BYTES, isAllowedAttachment } from "./constants";
 
@@ -36,22 +36,6 @@ async function buildPendingImages() {
       };
     })
   );
-}
-
-function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      const result = typeof reader.result === "string" ? reader.result : "";
-      const [, data = ""] = result.split(",");
-
-      resolve(data);
-    };
-
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
 }
 
 function buildUploadError(unsupportedCount, rejectedCount) {
@@ -196,7 +180,7 @@ export function useSearchBarAttachments() {
             name: cachedImage.name,
             mimeType: cachedImage.mimeType,
             size: image.file.size,
-            data: await fileToBase64(image.file),
+            blob: image.file,
             previewUrl: image.url || null,
           };
         }
@@ -205,9 +189,9 @@ export function useSearchBarAttachments() {
           return null;
         }
 
-        const data = await getCachedImageData(image.cacheKey);
+        const blob = await getCachedImageBlob(image.cacheKey);
 
-        if (!data) {
+        if (!blob) {
           return null;
         }
 
@@ -216,7 +200,7 @@ export function useSearchBarAttachments() {
           name: image.name || `image-${index + 1}`,
           mimeType: image.type,
           size: image.size || 0,
-          data,
+          blob,
           previewUrl: image.url || null,
         };
       })
