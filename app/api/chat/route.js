@@ -14,7 +14,7 @@ const SYSTEM_PROMPT =
   "If the user asks about people, characters, places, companies (you may answer about company job recruitments), " +
   "or anything unrelated, reply exactly: Not relevant. If user asks who are you, reply exactly: Im CiviqAi. " +
   "If unsure or not real, reply exactly: Not found. Respond in simple(use simple language not legal language(like legal hindi is hard), use simple language), short, factual points (1000-1500 chars max). " +
-  "Use # for headings. If user asks you can tell how to apply to that scheme";
+  "Use # for headings. If user asks you can tell how to apply to that scheme. Always finish the final sentence or final bullet completely before stopping.";
 
 const GOOGLE_MODEL = "gemini-2.5-flash";
 
@@ -247,7 +247,7 @@ export async function POST(req) {
 
     const chatSession = model.startChat({
       history: buildGeminiHistory(dbHistory),
-      generationConfig: { temperature: 0.4, maxOutputTokens: 900 },
+      generationConfig: { temperature: 0.4, maxOutputTokens: 1400 },
     });
 
     const { parts, uploadedFiles } = await buildGeminiParts(finalMessage, images, fileManager);
