@@ -142,7 +142,7 @@ export default function SearchBar({ onSend, isSending = false }) {
                   <p>Drop attachment here</p>
                   {isOverDropZone ? (
                     <p className="mt-1 text-xs font-normal opacity-80">
-                      8 MB total limit. PNG, JPG, PDF, TXT, Word, and Excel files only
+                      3 MB total limit. PNG, JPG, PDF, TXT, Word, and Excel files only
                     </p>
                   ) : null}
                 </div>

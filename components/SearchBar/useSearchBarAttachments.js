@@ -67,7 +67,7 @@ function buildUploadError(unsupportedCount, rejectedCount) {
 
   if (rejectedCount > 0) {
     messages.push(
-      `Total upload limit is 8 MB per message. ${rejectedCount} file${
+      `Total upload limit is 3 MB per message. ${rejectedCount} file${
         rejectedCount === 1 ? "" : "s"
       } not added.`
     );

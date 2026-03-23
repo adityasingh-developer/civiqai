@@ -6,6 +6,8 @@ import { getRequiredSession } from "@/lib/auth"
 import { connectDb } from "@/lib/mongoose"
 import User from "@/model/User"
 
+export const maxDuration = 60;
+
 const SYSTEM_PROMPT =
   "You only answer about real government/public schemes, policies, or programs from any country. " +
   "If the user asks about people, characters, places, companies (you may answer about company job recruitments), " +
